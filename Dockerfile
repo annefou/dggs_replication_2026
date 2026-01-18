@@ -17,7 +17,7 @@
 FROM python:3.11-slim-bookworm
 
 # Set labels
-LABEL maintainer="Anne Fouilloux <anne.fouilloux@lifewatch.eu>"
+LABEL maintainer="Anne Fouilloux <annef@simula.no>"
 LABEL description="Reproducible environment for DGGS benchmark replication"
 LABEL paper.doi="10.1080/20964471.2024.2429847"
 
@@ -73,9 +73,27 @@ RUN mkdir -p /app/results /app/data/vector /app/data/raster
 ENV PYTHONHASHSEED=42
 ENV PYTHONUNBUFFERED=1
 
-# Create entrypoint script that loads config.env
-RUN echo '#!/bin/bash\nset -a && . /app/config.env && set +a && exec "$@"' > /entrypoint.sh && \
-    chmod +x /entrypoint.sh
+# Create entrypoint script that loads config.env WITHOUT overwriting existing env vars
+# Uses bash parameter expansion: ${VAR:-default} only sets if VAR is unset
+RUN cat > /entrypoint.sh << 'EOF'
+#!/bin/bash
+# Load config.env but DON'T overwrite variables already set (e.g., from docker run -e)
+while IFS='=' read -r key value; do
+    # Skip comments and empty lines
+    [[ "$key" =~ ^#.*$ ]] && continue
+    [[ -z "$key" ]] && continue
+    # Remove quotes from value
+    value="${value%\"}"
+    value="${value#\"}"
+    # Only set if not already defined (allows docker run -e to override)
+    if [ -z "${!key}" ]; then
+        export "$key=$value"
+    fi
+done < /app/config.env
+
+exec "$@"
+EOF
+RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "run_replication.py", "--all"]
