@@ -1,0 +1,56 @@
+# DGGS Benchmark Replication - Python Dependencies
+#
+# ============================================================
+# THIS FILE IS THE SINGLE SOURCE OF TRUTH FOR PYTHON PACKAGES
+# ============================================================
+#
+# Used by:
+#   - Dockerfile (pip install -r requirements.txt)
+#   - environment.yml (pip: -r requirements.txt)
+#   - GitHub Actions (pip install -r requirements.txt)
+#   - Local development (pip install -r requirements.txt)
+#
+# Replication of: Law & Ardo (2024)
+# "Using a discrete global grid system for a scalable,
+# interoperable, and reproducible system of land-use mapping"
+# https://doi.org/10.1080/20964471.2024.2429847
+#
+# All versions are pinned for reproducibility
+# ============================================================
+
+# Core geospatial
+numpy==1.26.4
+pandas==2.2.0
+geopandas==0.14.3
+shapely==2.0.2
+pyproj==3.6.1
+rasterio==1.3.9
+fiona==1.9.5
+
+# H3 DGGS
+h3==3.7.7
+h3pandas==0.2.6
+
+# Data generation (Neutral Landscape Models)
+nlmpy==1.0.1
+
+# Visualization (optional, for result analysis)
+matplotlib==3.8.2
+seaborn==0.13.2
+
+# Performance measurement
+psutil==5.9.8
+memory_profiler==0.61.0
+
+# Data storage (Apache Parquet)
+pyarrow==15.0.0
+fastparquet==2024.2.0
+
+# Utilities
+tqdm==4.66.1
+click==8.1.7
+pyyaml==6.0.1
+
+# Jupyter for interactive analysis (optional)
+jupyter==1.0.0
+ipykernel==6.29.0

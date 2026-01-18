@@ -1,0 +1,33 @@
+# DGGS Benchmark Replication - Conda Environment
+#
+# Create:   conda env create -f environment.yml
+# Activate: conda activate dggs-replication
+# Update:   conda env update -f environment.yml
+#
+# NOTE: Python packages are defined in requirements.txt (single source of truth)
+#       This file only adds conda-specific system dependencies.
+#
+# Replication of: Law & Ardo (2024)
+# https://doi.org/10.1080/20964471.2024.2429847
+
+name: dggs-replication
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Python version
+  - python=3.11
+  
+  # System-level geospatial libraries (easier to install via conda than pip)
+  # These are the C libraries that Python packages depend on
+  - gdal=3.8.4
+  - libgdal=3.8.4
+  - geos=3.12.1
+  - proj=9.3.1
+  
+  # Install Python packages from requirements.txt
+  - pip
+  - pip:
+    - -r requirements.txt
