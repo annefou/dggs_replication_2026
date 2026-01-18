@@ -1,8 +1,8 @@
 # DGGS Benchmark Replication Environment
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
-[![Build Docker Image](https://github.com/annefou/dggs-benchmark-replication/actions/workflows/docker-build.yml/badge.svg)](https://github.com/annefou/dggs-benchmark-replication/actions/workflows/docker-build.yml)
-[![Run Replication](https://github.com/annefou/dggs-benchmark-replication/actions/workflows/run-replication.yml/badge.svg)](https://github.com/annefou/dggs-benchmark-replication/actions/workflows/run-replication.yml)
+[![Build Docker Image](https://github.com/annefou/dggs_replication_2026/actions/workflows/docker-build.yml/badge.svg)](https://github.com/annefou/dggs_replication_2026/actions/workflows/docker-build.yml)
+[![Run Replication](https://github.com/annefou/dggs_replication_2026/actions/workflows/run-replication.yml/badge.svg)](https://github.com/annefou/dggs_replication_2026/actions/workflows/run-replication.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **Replication study** of the benchmarks from Law & Ardo (2024)
