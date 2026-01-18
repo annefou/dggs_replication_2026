@@ -69,30 +69,11 @@ COPY README.md /app/
 RUN mkdir -p /app/results /app/data/vector /app/data/raster
 
 # Set environment variables for reproducibility
-# These are loaded from config.env at runtime
 ENV PYTHONHASHSEED=42
 ENV PYTHONUNBUFFERED=1
 
-# Create entrypoint script that loads config.env WITHOUT overwriting existing env vars
-# Uses bash parameter expansion: ${VAR:-default} only sets if VAR is unset
-RUN cat > /entrypoint.sh << 'EOF'
-#!/bin/bash
-# Load config.env but DON'T overwrite variables already set (e.g., from docker run -e)
-while IFS='=' read -r key value; do
-    # Skip comments and empty lines
-    [[ "$key" =~ ^#.*$ ]] && continue
-    [[ -z "$key" ]] && continue
-    # Remove quotes from value
-    value="${value%\"}"
-    value="${value#\"}"
-    # Only set if not already defined (allows docker run -e to override)
-    if [ -z "${!key}" ]; then
-        export "$key=$value"
-    fi
-done < /app/config.env
-
-exec "$@"
-EOF
+# Copy entrypoint script (loads config.env without overwriting -e vars)
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
