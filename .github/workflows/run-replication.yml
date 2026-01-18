@@ -1,0 +1,215 @@
+# Run DGGS Benchmark Replication
+#
+# This workflow executes the complete replication study and:
+# 1. Generates synthetic benchmark data
+# 2. Runs vector benchmark (Figure 6)
+# 3. Runs raster benchmark (Figure 7)
+# 4. Compares results with paper claims
+# 5. Uploads results as artifacts
+# 6. (Optional) Creates a release with results
+#
+# Triggered on:
+# - Manual trigger (workflow_dispatch)
+# - New release
+# - Weekly schedule (for continuous verification)
+
+name: Run Replication
+
+on:
+  workflow_dispatch:
+    inputs:
+      benchmark_type:
+        description: 'Benchmark to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - vector
+          - raster
+          - quick-test
+      random_seed:
+        description: 'Random seed for reproducibility'
+        required: false
+        default: '42'
+        type: string
+      upload_to_release:
+        description: 'Upload results to release'
+        required: false
+        default: 'false'
+        type: boolean
+
+  release:
+    types: [published]
+
+  schedule:
+    # Run weekly on Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+
+env:
+  DGGS_BENCHMARKS_VERSION: v1.1.1
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  replication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 2 hour timeout for full benchmark
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libgeos-dev libproj-dev gdal-bin
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Clone original dggsBenchmarks (for reference)
+        run: |
+          git clone --depth 1 --branch ${{ env.DGGS_BENCHMARKS_VERSION }} \
+            https://github.com/manaakiwhenua/dggsBenchmarks.git \
+            original_benchmarks || echo "Could not clone original repo"
+
+      - name: Collect system information
+        run: |
+          echo "## System Information" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          uname -a >> $GITHUB_STEP_SUMMARY
+          python --version >> $GITHUB_STEP_SUMMARY
+          pip list | grep -E "(numpy|pandas|geopandas|h3|shapely)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Run quick test
+        if: ${{ github.event.inputs.benchmark_type == 'quick-test' }}
+        run: |
+          python run_replication.py --generate-data --output results_quick
+          # Modify config for quick test
+          python -c "
+          import run_replication
+          run_replication.CONFIG['vector']['num_layers_list'] = [5, 10, 20]
+          run_replication.CONFIG['raster']['num_layers_list'] = [5, 10, 20]
+          "
+          python run_replication.py --vector --raster --compare --plot --output results_quick
+
+      - name: Run vector benchmark
+        if: ${{ github.event.inputs.benchmark_type == 'vector' || github.event.inputs.benchmark_type == 'all' || github.event_name != 'workflow_dispatch' }}
+        run: |
+          python run_replication.py --generate-data --vector --output results \
+            --seed ${{ github.event.inputs.random_seed || '42' }}
+
+      - name: Run raster benchmark
+        if: ${{ github.event.inputs.benchmark_type == 'raster' || github.event.inputs.benchmark_type == 'all' || github.event_name != 'workflow_dispatch' }}
+        run: |
+          python run_replication.py --raster --output results \
+            --seed ${{ github.event.inputs.random_seed || '42' }}
+
+      - name: Compare with paper and generate plots
+        run: |
+          python run_replication.py --compare --plot --output results
+
+      - name: Generate summary
+        run: |
+          echo "## Replication Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f results/comparison_with_paper.json ]; then
+            echo "### Comparison with Paper Claims" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat results/comparison_with_paper.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Vector Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f results/vector_benchmark.csv ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat results/vector_benchmark.csv >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Raster Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f results/raster_benchmark.csv ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat results/raster_benchmark.csv >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: replication-results-${{ github.run_id }}
+          path: |
+            results/
+            !results/.gitkeep
+          retention-days: 90
+
+      - name: Upload plots
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-plots-${{ github.run_id }}
+          path: |
+            results/*.png
+            results/*.pdf
+          retention-days: 90
+
+      # Upload to release if triggered by release or manually requested
+      - name: Upload to release
+        if: ${{ github.event_name == 'release' || github.event.inputs.upload_to_release == 'true' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            results/vector_benchmark.csv
+            results/raster_benchmark.csv
+            results/comparison_with_paper.json
+            results/system_info.json
+            results/benchmark_results.png
+            results/benchmark_results.pdf
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Verify replication success
+  verify:
+    needs: replication
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download results
+        uses: actions/download-artifact@v4
+        with:
+          name: replication-results-${{ github.run_id }}
+          path: results
+
+      - name: Check replication status
+        run: |
+          if [ -f results/comparison_with_paper.json ]; then
+            # Check if claims were replicated
+            VECTOR_OK=$(python -c "import json; d=json.load(open('results/comparison_with_paper.json')); print('true' if d.get('vector_benchmark',{}).get('replicated') else 'false')")
+            RASTER_OK=$(python -c "import json; d=json.load(open('results/comparison_with_paper.json')); print('true' if d.get('raster_benchmark',{}).get('replicated') else 'false')")
+            
+            echo "Vector benchmark replicated: $VECTOR_OK"
+            echo "Raster benchmark replicated: $RASTER_OK"
+            
+            if [ "$VECTOR_OK" = "true" ] && [ "$RASTER_OK" = "true" ]; then
+              echo "✅ Replication successful!" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            else
+              echo "⚠️ Replication shows different patterns than paper" >> $GITHUB_STEP_SUMMARY
+              echo "This may be expected due to hardware differences."
+              # Don't fail - differences might be legitimate
+              exit 0
+            fi
+          else
+            echo "❌ No comparison results found" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

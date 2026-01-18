@@ -1,0 +1,55 @@
+# This CITATION.cff file was generated to enable proper citation of this software.
+# See https://citation-file-format.github.io/ for the format specification.
+
+cff-version: 1.2.0
+title: "DGGS Benchmark Replication Environment"
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+authors:
+  - family-names: "Fouilloux"
+    given-names: "Anne"
+    orcid: "https://orcid.org/0000-0002-1784-2920"
+    affiliation: "Lifewatch ERIC"
+repository-code: "https://github.com/annefou/dggs-benchmark-replication"
+url: "https://github.com/annefou/dggs-benchmark-replication"
+license: MIT
+version: "1.0.0"
+date-released: "2026-01-17"
+keywords:
+  - DGGS
+  - discrete global grid system
+  - H3
+  - reproducibility
+  - replication study
+  - geospatial
+  - benchmark
+abstract: >-
+  A reproducible environment for replicating the benchmarks from 
+  Law & Ardo (2024) "Using a discrete global grid system for a scalable, 
+  interoperable, and reproducible system of land-use mapping". 
+  Provides Docker containers, pinned dependencies, and GitHub Actions 
+  for automated benchmark execution and verification.
+
+# Reference to the original paper being replicated
+references:
+  - type: article
+    title: "Using a discrete global grid system for a scalable, interoperable, and reproducible system of land-use mapping"
+    authors:
+      - family-names: "Law"
+        given-names: "Richard M."
+        orcid: "https://orcid.org/0000-0002-7400-2530"
+      - family-names: "Ardo"
+        given-names: "James"
+        orcid: "https://orcid.org/0009-0008-1201-9733"
+    journal: "Big Earth Data"
+    year: 2024
+    doi: "10.1080/20964471.2024.2429847"
+  - type: software
+    title: "dggsBenchmarks"
+    version: "v1.1.1"
+    authors:
+      - family-names: "Law"
+        given-names: "Richard M."
+      - family-names: "Ardo"
+        given-names: "James"
+    repository-code: "https://github.com/manaakiwhenua/dggsBenchmarks"
