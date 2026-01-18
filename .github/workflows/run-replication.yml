@@ -97,55 +97,43 @@ jobs:
         id: params
         run: |
           BENCHMARK_TYPE="${{ github.event.inputs.benchmark_type || 'ci-test' }}"
+          echo "Benchmark type: $BENCHMARK_TYPE"
           
           case "$BENCHMARK_TYPE" in
             "quick-test")
-              # Minimal test - just verify code runs
               VECTOR_LAYERS="5,10,20"
               RASTER_LAYERS="5,10,20"
               echo "### Benchmark Mode: Quick Test (minimal)" >> $GITHUB_STEP_SUMMARY
               ;;
             "ci-test")
-              # Reduced dataset for CI - fits in GitHub Actions memory (~7GB)
               VECTOR_LAYERS="10,20,50,100,200"
               RASTER_LAYERS="10,50,100,500,1000"
               echo "### Benchmark Mode: CI Test (reduced dataset)" >> $GITHUB_STEP_SUMMARY
               ;;
             "full")
-              # Full benchmark as in paper - uses values from config.env
-              # These are loaded inside the container
-              VECTOR_LAYERS=""
-              RASTER_LAYERS=""
-              echo "### Benchmark Mode: Full (paper values from config.env)" >> $GITHUB_STEP_SUMMARY
-              echo "⚠️ May require >16GB RAM - might OOM on GitHub Actions" >> $GITHUB_STEP_SUMMARY
+              VECTOR_LAYERS="10,20,50,100,200,500,1000"
+              RASTER_LAYERS="10,50,100,500,1000,5000,10000"
+              echo "### Benchmark Mode: Full (paper values)" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ Requires >16GB RAM - may OOM on GitHub Actions" >> $GITHUB_STEP_SUMMARY
               ;;
           esac
           
           echo "vector_layers=${VECTOR_LAYERS}" >> $GITHUB_OUTPUT
           echo "raster_layers=${RASTER_LAYERS}" >> $GITHUB_OUTPUT
-          
-          if [ -n "$VECTOR_LAYERS" ]; then
-            echo "- Vector layers: ${VECTOR_LAYERS}" >> $GITHUB_STEP_SUMMARY
-            echo "- Raster layers: ${RASTER_LAYERS}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- Using paper values from config.env" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "- Vector layers: ${VECTOR_LAYERS}" >> $GITHUB_STEP_SUMMARY
+          echo "- Raster layers: ${RASTER_LAYERS}" >> $GITHUB_STEP_SUMMARY
 
       - name: Run benchmark
         run: |
-          # Build environment variable arguments
-          ENV_ARGS=""
-          if [ -n "${{ steps.params.outputs.vector_layers }}" ]; then
-            ENV_ARGS="$ENV_ARGS -e VECTOR_LAYERS=${{ steps.params.outputs.vector_layers }}"
-          fi
-          if [ -n "${{ steps.params.outputs.raster_layers }}" ]; then
-            ENV_ARGS="$ENV_ARGS -e RASTER_LAYERS=${{ steps.params.outputs.raster_layers }}"
-          fi
+          echo "Running with:"
+          echo "  VECTOR_LAYERS=${{ steps.params.outputs.vector_layers }}"
+          echo "  RASTER_LAYERS=${{ steps.params.outputs.raster_layers }}"
           
           docker run --rm \
             -v ${{ github.workspace }}/results:/app/results \
             -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
-            $ENV_ARGS \
+            -e VECTOR_LAYERS=${{ steps.params.outputs.vector_layers }} \
+            -e RASTER_LAYERS=${{ steps.params.outputs.raster_layers }} \
             ${{ steps.image.outputs.full_name }} \
             python run_replication.py --all --output results
 
