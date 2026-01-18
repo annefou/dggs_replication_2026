@@ -101,6 +101,12 @@ if _missing:
 # Configuration
 # =============================================================================
 
+def parse_layer_list(value: str) -> List[int]:
+    """Parse comma-separated layer list string to list of ints."""
+    if not value:
+        return []
+    return [int(x.strip()) for x in value.split(',')]
+
 CONFIG = {
     "random_seed": int(os.environ.get("RANDOM_SEED", _env_config.get("RANDOM_SEED", "42"))),
     "h3_resolution": int(os.environ.get("H3_RESOLUTION", _env_config.get("H3_RESOLUTION", "9"))),
@@ -118,16 +124,22 @@ CONFIG = {
     },
     
     # Vector benchmark parameters (Figure 6)
+    # Layer counts from config.env, with paper defaults as fallback
     "vector": {
-        "num_layers_list": [10, 20, 50, 100, 200, 500, 1000],
+        "num_layers_list": parse_layer_list(
+            os.environ.get("VECTOR_LAYERS", _env_config.get("VECTOR_LAYERS", "10,20,50,100,200,500,1000"))
+        ),
         "num_polygons_per_layer": 100,
         "bbox": (-180, -85, 180, 85),  # Global extent
         "max_layers_before_failure": 500,  # Expected failure point for vector method
     },
     
     # Raster benchmark parameters (Figure 7)
+    # Layer counts from config.env, with paper defaults as fallback
     "raster": {
-        "num_layers_list": [10, 50, 100, 500, 1000, 5000, 10000],
+        "num_layers_list": parse_layer_list(
+            os.environ.get("RASTER_LAYERS", _env_config.get("RASTER_LAYERS", "10,50,100,500,1000,5000,10000"))
+        ),
         "raster_size": (100, 100),  # 100x100 pixels per layer
         "num_classes": 10,
     },
@@ -772,13 +784,33 @@ Examples:
     parser.add_argument('--compare', action='store_true', help='Compare results with paper')
     parser.add_argument('--plot', action='store_true', help='Generate plots')
     parser.add_argument('--output', '-o', default='results', help='Output directory')
-    parser.add_argument('--seed', type=int, default=42, help='Random seed')
+    parser.add_argument('--seed', type=int, default=None,
+                        help='Random seed (overrides config.env/RANDOM_SEED)')
+    parser.add_argument('--vector-layers', type=str, default=None,
+                        help='Comma-separated list of vector layer counts (overrides config.env/VECTOR_LAYERS)')
+    parser.add_argument('--raster-layers', type=str, default=None,
+                        help='Comma-separated list of raster layer counts (overrides config.env/RASTER_LAYERS)')
     
     args = parser.parse_args()
     
-    # Update config
-    CONFIG["random_seed"] = args.seed
+    # CLI args override config (config already includes env var overrides)
+    if args.seed is not None:
+        CONFIG["random_seed"] = args.seed
     CONFIG["results_dir"] = args.output
+    
+    # Override layer counts if specified via CLI
+    if args.vector_layers:
+        CONFIG["vector"]["num_layers_list"] = [int(x.strip()) for x in args.vector_layers.split(',')]
+    
+    if args.raster_layers:
+        CONFIG["raster"]["num_layers_list"] = [int(x.strip()) for x in args.raster_layers.split(',')]
+    
+    # Print effective configuration
+    print(f"Configuration:")
+    print(f"  Random seed: {CONFIG['random_seed']}")
+    print(f"  Vector layers: {CONFIG['vector']['num_layers_list']}")
+    print(f"  Raster layers: {CONFIG['raster']['num_layers_list']}")
+    print(f"  Output directory: {CONFIG['results_dir']}")
     
     # Setup directories
     results_dir = Path(args.output)

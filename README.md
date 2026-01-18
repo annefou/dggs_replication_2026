@@ -1,9 +1,25 @@
 # DGGS Benchmark Replication Environment
 
+<!-- 
+  BADGE SETUP INSTRUCTIONS:
+  1. Go to your repo > Actions > select workflow > click "..." > "Create status badge"
+  2. Copy the markdown and paste below
+  3. Replace the placeholder badges below with your actual badges
+-->
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
-[![Build Docker Image](https://github.com/annefou/dggs_replication_2026/actions/workflows/docker-build.yml/badge.svg)](https://github.com/annefou/dggs_replication_2026/actions/workflows/docker-build.yml)
-[![Run Replication](https://github.com/annefou/dggs_replication_2026/actions/workflows/run-replication.yml/badge.svg)](https://github.com/annefou/dggs_replication_2026/actions/workflows/run-replication.yml)
+![Build Docker Image](https://github.com/annefou/dggs-benchmark-replication/actions/workflows/docker-build.yml/badge.svg)
+![Run Replication](https://github.com/annefou/dggs-benchmark-replication/actions/workflows/run-replication.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+<!--
+  If the above badges don't work, generate them from GitHub:
+  1. Go to: https://github.com/annefou/dggs-benchmark-replication/actions
+  2. Click on a workflow (e.g., "Build Docker Image")
+  3. Click the "..." button (top right, next to search)
+  4. Click "Create status badge"
+  5. Copy the Markdown
+-->
 
 > **Replication study** of the benchmarks from Law & Ardo (2024)
 
@@ -91,6 +107,46 @@ The `.zenodo.json` file contains metadata for proper citation. After the first r
 }
 ```
 
+## Resource Requirements
+
+The benchmarks require significant memory, especially for large datasets:
+
+| Benchmark Mode | Vector Layers | Raster Layers | Est. RAM | Notes |
+|---------------|---------------|---------------|----------|-------|
+| `quick-test` | 5, 10, 20 | 5, 10, 20 | ~2 GB | Minimal test |
+| `ci-test` | 10-200 | 10-1000 | ~4 GB | GitHub Actions compatible |
+| `full` | 10-1000 | 10-10000 | ~16+ GB | Paper values (default in config.env) |
+
+**GitHub Actions runners have ~7GB RAM**, so the `ci-test` mode is used by default in CI.
+
+### Running with Different Dataset Sizes
+
+```bash
+# Quick test (minimal)
+docker run -v $(pwd)/results:/app/results \
+    -e VECTOR_LAYERS=5,10,20 \
+    -e RASTER_LAYERS=5,10,20 \
+    ghcr.io/annefou/dggs-benchmark-replication:latest
+
+# CI test (reduced)
+docker run -v $(pwd)/results:/app/results \
+    -e VECTOR_LAYERS=10,20,50,100,200 \
+    -e RASTER_LAYERS=10,50,100,500,1000 \
+    ghcr.io/annefou/dggs-benchmark-replication:latest
+
+# Full benchmark (paper values - requires ~16GB+ RAM)
+# Uses defaults from config.env
+docker run -v $(pwd)/results:/app/results \
+    ghcr.io/annefou/dggs-benchmark-replication:latest
+
+# Or override via CLI
+docker run -v $(pwd)/results:/app/results \
+    ghcr.io/annefou/dggs-benchmark-replication:latest \
+    python run_replication.py --all \
+    --vector-layers 10,20,50,100,200,500,1000 \
+    --raster-layers 10,50,100,500,1000,5000,10000
+```
+
 ## Quick Start
 
 ### Configuration
@@ -104,9 +160,18 @@ DGGS_BENCHMARKS_VERSION=v1.1.1
 PYTHON_VERSION=3.11
 H3_RESOLUTION=9
 RANDOM_SEED=42
+
+# Dataset sizes (paper values by default)
+VECTOR_LAYERS=10,20,50,100,200,500,1000
+RASTER_LAYERS=10,50,100,500,1000,5000,10000
 ```
 
-All components read from this file:
+**Configuration priority** (highest to lowest):
+1. CLI arguments (`--vector-layers`, `--raster-layers`, `--seed`)
+2. Environment variables (`VECTOR_LAYERS`, `RASTER_LAYERS`, `RANDOM_SEED`)
+3. `config.env` file
+
+All components read from `config.env`:
 
 | File | How it reads config.env |
 |------|------------------------|
@@ -114,6 +179,13 @@ All components read from this file:
 | `run_replication.py` | `load_config_env()` function |
 | `Makefile` | `include config.env` |
 | GitHub Actions | Sources in workflow steps |
+
+**Python dependencies** are defined in `requirements.txt` (single source of truth):
+
+| File | Purpose |
+|------|---------|
+| `requirements.txt` | All Python packages with pinned versions |
+| `environment.yml` | Conda wrapper that references `requirements.txt` |
 
 **To replicate a different version:**
 
@@ -133,16 +205,27 @@ All components read from this file:
 
 ### Option 1: Docker (Recommended)
 
+The Docker image is automatically built and pushed to **GitHub Container Registry** (ghcr.io) on every push to main and on releases.
+
 ```bash
-# Build the container
+# Pull pre-built image from GitHub Container Registry
+docker pull ghcr.io/annefou/dggs-benchmark-replication:latest
+
+# Run replication
+docker run -v $(pwd)/results:/app/results ghcr.io/annefou/dggs-benchmark-replication:latest
+
+# Or build locally
 docker build -t dggs-benchmark-replication .
-
-# Run complete replication
-docker run -it --rm -v $(pwd)/results:/app/results dggs-benchmark-replication
-
-# Or run interactively
-docker run -it --rm -v $(pwd)/results:/app/results dggs-benchmark-replication bash
+docker run -v $(pwd)/results:/app/results dggs-benchmark-replication
 ```
+
+**Available image tags:**
+
+| Tag | Description |
+|-----|-------------|
+| `latest` | Latest build from main branch |
+| `v1.0.0` | Specific release version |
+| `sha-abc1234` | Specific commit |
 
 ### Option 2: Local Python Environment
 
@@ -160,14 +243,26 @@ python run_replication.py --all
 
 ### Option 3: Conda Environment
 
+Conda is useful if you have trouble installing GDAL/GEOS system libraries.
+
 ```bash
-# Create environment from file
+# Create environment (uses requirements.txt for Python packages)
 conda env create -f environment.yml
 conda activate dggs-replication
 
 # Run replication
 python run_replication.py --all
 ```
+
+### Dependency Files
+
+| File | Purpose | Used by |
+|------|---------|---------|
+| `requirements.txt` | **Single source of truth** for Python packages | Docker, pip, conda |
+| `environment.yml` | Conda wrapper + system libs (GDAL) | Conda only |
+
+> **Note:** `environment.yml` references `requirements.txt` via `pip: -r requirements.txt`. 
+> Only edit `requirements.txt` to change Python package versions.
 
 ## Usage
 
@@ -301,7 +396,7 @@ If you're using this as a template for your own replication study:
 
 ```bash
 # Clone this template
-git clone https://github.com/YOUR_USERNAME/dggs-benchmark-replication.git
+git clone https://github.com/annefou/dggs-benchmark-replication.git
 cd dggs-benchmark-replication
 
 # Or use GitHub's "Use this template" feature

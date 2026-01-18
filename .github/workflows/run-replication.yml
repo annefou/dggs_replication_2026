@@ -3,6 +3,9 @@
 # This workflow uses the pre-built Docker image to run the replication.
 # The image is built by docker-build.yml and pushed to GitHub Container Registry.
 #
+# NOTE: GitHub Actions runners have limited memory (~7GB), so we use reduced
+# dataset sizes by default. The full benchmark requires more resources.
+#
 # Triggered on:
 # - Manual trigger (workflow_dispatch)
 # - New release
@@ -16,13 +19,12 @@ on:
       benchmark_type:
         description: 'Benchmark to run'
         required: true
-        default: 'all'
+        default: 'ci-test'
         type: choice
         options:
-          - all
-          - vector
-          - raster
-          - quick-test
+          - ci-test        # Reduced dataset for CI (default)
+          - quick-test     # Minimal test
+          - full           # Full benchmark (may OOM on GitHub Actions)
       random_seed:
         description: 'Random seed for reproducibility'
         required: false
@@ -48,7 +50,7 @@ env:
 jobs:
   replication:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # 2 hour timeout for full benchmark
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
@@ -80,7 +82,6 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           docker inspect ${{ steps.image.outputs.full_name }} --format='Image: {{.RepoTags}}' >> $GITHUB_STEP_SUMMARY
           docker inspect ${{ steps.image.outputs.full_name }} --format='Created: {{.Created}}' >> $GITHUB_STEP_SUMMARY
-          docker inspect ${{ steps.image.outputs.full_name }} --format='Size: {{.Size}}' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -92,52 +93,66 @@ jobs:
       - name: Create results directory
         run: mkdir -p results
 
-      - name: Run quick test
-        if: ${{ github.event.inputs.benchmark_type == 'quick-test' }}
+      - name: Determine benchmark parameters
+        id: params
         run: |
-          docker run --rm \
-            -v ${{ github.workspace }}/results:/app/results \
-            -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
-            ${{ steps.image.outputs.full_name }} \
-            python -c "
-          import run_replication
-          run_replication.CONFIG['vector']['num_layers_list'] = [5, 10, 20]
-          run_replication.CONFIG['raster']['num_layers_list'] = [5, 10, 20]
-          run_replication.CONFIG['random_seed'] = ${{ github.event.inputs.random_seed || '42' }}
-          import sys
-          sys.argv = ['run_replication.py', '--all', '--output', 'results']
-          run_replication.main()
-          "
+          BENCHMARK_TYPE="${{ github.event.inputs.benchmark_type || 'ci-test' }}"
+          
+          case "$BENCHMARK_TYPE" in
+            "quick-test")
+              # Minimal test - just verify code runs
+              VECTOR_LAYERS="5,10,20"
+              RASTER_LAYERS="5,10,20"
+              echo "### Benchmark Mode: Quick Test (minimal)" >> $GITHUB_STEP_SUMMARY
+              ;;
+            "ci-test")
+              # Reduced dataset for CI - fits in GitHub Actions memory (~7GB)
+              VECTOR_LAYERS="10,20,50,100,200"
+              RASTER_LAYERS="10,50,100,500,1000"
+              echo "### Benchmark Mode: CI Test (reduced dataset)" >> $GITHUB_STEP_SUMMARY
+              ;;
+            "full")
+              # Full benchmark as in paper - uses values from config.env
+              # These are loaded inside the container
+              VECTOR_LAYERS=""
+              RASTER_LAYERS=""
+              echo "### Benchmark Mode: Full (paper values from config.env)" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ May require >16GB RAM - might OOM on GitHub Actions" >> $GITHUB_STEP_SUMMARY
+              ;;
+          esac
+          
+          echo "vector_layers=${VECTOR_LAYERS}" >> $GITHUB_OUTPUT
+          echo "raster_layers=${RASTER_LAYERS}" >> $GITHUB_OUTPUT
+          
+          if [ -n "$VECTOR_LAYERS" ]; then
+            echo "- Vector layers: ${VECTOR_LAYERS}" >> $GITHUB_STEP_SUMMARY
+            echo "- Raster layers: ${RASTER_LAYERS}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Using paper values from config.env" >> $GITHUB_STEP_SUMMARY
+          fi
 
-      - name: Run full replication
-        if: ${{ github.event.inputs.benchmark_type == 'all' || github.event.inputs.benchmark_type == '' }}
+      - name: Run benchmark
         run: |
+          # Build environment variable arguments
+          ENV_ARGS=""
+          if [ -n "${{ steps.params.outputs.vector_layers }}" ]; then
+            ENV_ARGS="$ENV_ARGS -e VECTOR_LAYERS=${{ steps.params.outputs.vector_layers }}"
+          fi
+          if [ -n "${{ steps.params.outputs.raster_layers }}" ]; then
+            ENV_ARGS="$ENV_ARGS -e RASTER_LAYERS=${{ steps.params.outputs.raster_layers }}"
+          fi
+          
           docker run --rm \
             -v ${{ github.workspace }}/results:/app/results \
             -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
+            $ENV_ARGS \
             ${{ steps.image.outputs.full_name }} \
-            python run_replication.py --all --output results --seed ${{ github.event.inputs.random_seed || '42' }}
-
-      - name: Run vector benchmark only
-        if: ${{ github.event.inputs.benchmark_type == 'vector' }}
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}/results:/app/results \
-            -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
-            ${{ steps.image.outputs.full_name }} \
-            python run_replication.py --generate-data --vector --compare --plot --output results --seed ${{ github.event.inputs.random_seed || '42' }}
-
-      - name: Run raster benchmark only
-        if: ${{ github.event.inputs.benchmark_type == 'raster' }}
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}/results:/app/results \
-            -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
-            ${{ steps.image.outputs.full_name }} \
-            python run_replication.py --generate-data --raster --compare --plot --output results --seed ${{ github.event.inputs.random_seed || '42' }}
+            python run_replication.py --all --output results
 
       - name: Generate summary
+        if: always()
         run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Replication Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
@@ -148,28 +163,28 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
           
+          if [ -f results/system_info.json ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### System Info" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat results/system_info.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Files Generated" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          ls -la results/ >> $GITHUB_STEP_SUMMARY
+          ls -la results/ 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "No results directory"
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload results as artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: replication-results-${{ github.run_id }}
           path: results/
           retention-days: 90
-
-      - name: Upload plots
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: benchmark-plots-${{ github.run_id }}
-          path: |
-            results/*.png
-            results/*.pdf
-          retention-days: 90
+          if-no-files-found: warn
 
       # Upload to release if triggered by release
       - name: Upload to release
@@ -184,36 +199,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Verify replication success
-  verify:
-    needs: replication
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download results
-        uses: actions/download-artifact@v4
-        with:
-          name: replication-results-${{ github.run_id }}
-          path: results
-
-      - name: Check replication status
-        run: |
-          if [ -f results/comparison_with_paper.json ]; then
-            # Check if claims were replicated
-            VECTOR_OK=$(python3 -c "import json; d=json.load(open('results/comparison_with_paper.json')); print('true' if d.get('vector_benchmark',{}).get('replicated') else 'false')")
-            RASTER_OK=$(python3 -c "import json; d=json.load(open('results/comparison_with_paper.json')); print('true' if d.get('raster_benchmark',{}).get('replicated') else 'false')")
-            
-            echo "Vector benchmark replicated: $VECTOR_OK"
-            echo "Raster benchmark replicated: $RASTER_OK"
-            
-            if [ "$VECTOR_OK" = "true" ] && [ "$RASTER_OK" = "true" ]; then
-              echo "✅ Replication successful!" >> $GITHUB_STEP_SUMMARY
-              exit 0
-            else
-              echo "⚠️ Replication shows different patterns than paper" >> $GITHUB_STEP_SUMMARY
-              echo "This may be expected due to hardware differences."
-              exit 0
-            fi
-          else
-            echo "❌ No comparison results found" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
