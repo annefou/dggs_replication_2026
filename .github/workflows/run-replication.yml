@@ -1,12 +1,7 @@
 # Run DGGS Benchmark Replication
 #
-# This workflow executes the complete replication study and:
-# 1. Generates synthetic benchmark data
-# 2. Runs vector benchmark (Figure 6)
-# 3. Runs raster benchmark (Figure 7)
-# 4. Compares results with paper claims
-# 5. Uploads results as artifacts
-# 6. (Optional) Creates a release with results
+# This workflow uses the pre-built Docker image to run the replication.
+# The image is built by docker-build.yml and pushed to GitHub Container Registry.
 #
 # Triggered on:
 # - Manual trigger (workflow_dispatch)
@@ -33,11 +28,11 @@ on:
         required: false
         default: '42'
         type: string
-      upload_to_release:
-        description: 'Upload results to release'
+      image_tag:
+        description: 'Docker image tag to use'
         required: false
-        default: 'false'
-        type: boolean
+        default: 'latest'
+        type: string
 
   release:
     types: [published]
@@ -47,8 +42,8 @@ on:
     - cron: '0 0 * * 0'
 
 env:
-  DGGS_BENCHMARKS_VERSION: v1.1.1
-  PYTHON_VERSION: '3.11'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   replication:
@@ -59,64 +54,87 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install system dependencies
+      - name: Determine image tag
+        id: image
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgdal-dev libgeos-dev libproj-dev gdal-bin
+          TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "full_name=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "Using image: ${IMAGE}"
 
-      - name: Install Python dependencies
+      - name: Pull Docker image
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          docker pull ${{ steps.image.outputs.full_name }}
 
-      - name: Clone original dggsBenchmarks (for reference)
+      - name: Show image info
         run: |
-          git clone --depth 1 --branch ${{ env.DGGS_BENCHMARKS_VERSION }} \
-            https://github.com/manaakiwhenua/dggsBenchmarks.git \
-            original_benchmarks || echo "Could not clone original repo"
-
-      - name: Collect system information
-        run: |
-          echo "## System Information" >> $GITHUB_STEP_SUMMARY
+          echo "## Docker Image Info" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          uname -a >> $GITHUB_STEP_SUMMARY
-          python --version >> $GITHUB_STEP_SUMMARY
-          pip list | grep -E "(numpy|pandas|geopandas|h3|shapely)" >> $GITHUB_STEP_SUMMARY
+          docker inspect ${{ steps.image.outputs.full_name }} --format='Image: {{.RepoTags}}' >> $GITHUB_STEP_SUMMARY
+          docker inspect ${{ steps.image.outputs.full_name }} --format='Created: {{.Created}}' >> $GITHUB_STEP_SUMMARY
+          docker inspect ${{ steps.image.outputs.full_name }} --format='Size: {{.Size}}' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Configuration (from config.env in image)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          docker run --rm ${{ steps.image.outputs.full_name }} cat /app/config.env >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Create results directory
+        run: mkdir -p results
 
       - name: Run quick test
         if: ${{ github.event.inputs.benchmark_type == 'quick-test' }}
         run: |
-          python run_replication.py --generate-data --output results_quick
-          # Modify config for quick test
-          python -c "
+          docker run --rm \
+            -v ${{ github.workspace }}/results:/app/results \
+            -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
+            ${{ steps.image.outputs.full_name }} \
+            python -c "
           import run_replication
           run_replication.CONFIG['vector']['num_layers_list'] = [5, 10, 20]
           run_replication.CONFIG['raster']['num_layers_list'] = [5, 10, 20]
+          run_replication.CONFIG['random_seed'] = ${{ github.event.inputs.random_seed || '42' }}
+          import sys
+          sys.argv = ['run_replication.py', '--all', '--output', 'results']
+          run_replication.main()
           "
-          python run_replication.py --vector --raster --compare --plot --output results_quick
 
-      - name: Run vector benchmark
-        if: ${{ github.event.inputs.benchmark_type == 'vector' || github.event.inputs.benchmark_type == 'all' || github.event_name != 'workflow_dispatch' }}
+      - name: Run full replication
+        if: ${{ github.event.inputs.benchmark_type == 'all' || github.event.inputs.benchmark_type == '' }}
         run: |
-          python run_replication.py --generate-data --vector --output results \
-            --seed ${{ github.event.inputs.random_seed || '42' }}
+          docker run --rm \
+            -v ${{ github.workspace }}/results:/app/results \
+            -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
+            ${{ steps.image.outputs.full_name }} \
+            python run_replication.py --all --output results --seed ${{ github.event.inputs.random_seed || '42' }}
 
-      - name: Run raster benchmark
-        if: ${{ github.event.inputs.benchmark_type == 'raster' || github.event.inputs.benchmark_type == 'all' || github.event_name != 'workflow_dispatch' }}
+      - name: Run vector benchmark only
+        if: ${{ github.event.inputs.benchmark_type == 'vector' }}
         run: |
-          python run_replication.py --raster --output results \
-            --seed ${{ github.event.inputs.random_seed || '42' }}
+          docker run --rm \
+            -v ${{ github.workspace }}/results:/app/results \
+            -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
+            ${{ steps.image.outputs.full_name }} \
+            python run_replication.py --generate-data --vector --compare --plot --output results --seed ${{ github.event.inputs.random_seed || '42' }}
 
-      - name: Compare with paper and generate plots
+      - name: Run raster benchmark only
+        if: ${{ github.event.inputs.benchmark_type == 'raster' }}
         run: |
-          python run_replication.py --compare --plot --output results
+          docker run --rm \
+            -v ${{ github.workspace }}/results:/app/results \
+            -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
+            ${{ steps.image.outputs.full_name }} \
+            python run_replication.py --generate-data --raster --compare --plot --output results --seed ${{ github.event.inputs.random_seed || '42' }}
 
       - name: Generate summary
         run: |
@@ -131,32 +149,21 @@ jobs:
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Vector Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          if [ -f results/vector_benchmark.csv ]; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat results/vector_benchmark.csv >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Raster Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          if [ -f results/raster_benchmark.csv ]; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat results/raster_benchmark.csv >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "### Files Generated" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -la results/ >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload results as artifact
         uses: actions/upload-artifact@v4
         with:
           name: replication-results-${{ github.run_id }}
-          path: |
-            results/
-            !results/.gitkeep
+          path: results/
           retention-days: 90
 
       - name: Upload plots
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: benchmark-plots-${{ github.run_id }}
           path: |
@@ -164,18 +171,16 @@ jobs:
             results/*.pdf
           retention-days: 90
 
-      # Upload to release if triggered by release or manually requested
+      # Upload to release if triggered by release
       - name: Upload to release
-        if: ${{ github.event_name == 'release' || github.event.inputs.upload_to_release == 'true' }}
+        if: ${{ github.event_name == 'release' }}
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            results/vector_benchmark.csv
-            results/raster_benchmark.csv
-            results/comparison_with_paper.json
-            results/system_info.json
-            results/benchmark_results.png
-            results/benchmark_results.pdf
+            results/*.csv
+            results/*.json
+            results/*.png
+            results/*.pdf
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -194,8 +199,8 @@ jobs:
         run: |
           if [ -f results/comparison_with_paper.json ]; then
             # Check if claims were replicated
-            VECTOR_OK=$(python -c "import json; d=json.load(open('results/comparison_with_paper.json')); print('true' if d.get('vector_benchmark',{}).get('replicated') else 'false')")
-            RASTER_OK=$(python -c "import json; d=json.load(open('results/comparison_with_paper.json')); print('true' if d.get('raster_benchmark',{}).get('replicated') else 'false')")
+            VECTOR_OK=$(python3 -c "import json; d=json.load(open('results/comparison_with_paper.json')); print('true' if d.get('vector_benchmark',{}).get('replicated') else 'false')")
+            RASTER_OK=$(python3 -c "import json; d=json.load(open('results/comparison_with_paper.json')); print('true' if d.get('raster_benchmark',{}).get('replicated') else 'false')")
             
             echo "Vector benchmark replicated: $VECTOR_OK"
             echo "Raster benchmark replicated: $RASTER_OK"
@@ -206,7 +211,6 @@ jobs:
             else
               echo "⚠️ Replication shows different patterns than paper" >> $GITHUB_STEP_SUMMARY
               echo "This may be expected due to hardware differences."
-              # Don't fail - differences might be legitimate
               exit 0
             fi
           else
