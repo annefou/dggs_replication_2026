@@ -129,7 +129,9 @@ CONFIG = {
         "num_layers_list": parse_layer_list(
             os.environ.get("VECTOR_LAYERS", _env_config.get("VECTOR_LAYERS", "10,20,50,100,200,500,1000"))
         ),
-        "num_polygons_per_layer": 100,
+        "num_polygons_per_layer": int(
+            os.environ.get("POLYGONS_PER_LAYER", _env_config.get("POLYGONS_PER_LAYER", "100"))
+        ),
         "bbox": (-180, -85, 180, 85),  # Global extent
         "max_layers_before_failure": 500,  # Expected failure point for vector method
     },
@@ -809,6 +811,7 @@ Examples:
     print(f"Configuration:")
     print(f"  Random seed: {CONFIG['random_seed']}")
     print(f"  Vector layers: {CONFIG['vector']['num_layers_list']}")
+    print(f"  Polygons per layer: {CONFIG['vector']['num_polygons_per_layer']}")
     print(f"  Raster layers: {CONFIG['raster']['num_layers_list']}")
     print(f"  Output directory: {CONFIG['results_dir']}")
     

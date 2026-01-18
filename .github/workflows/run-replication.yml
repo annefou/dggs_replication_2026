@@ -103,16 +103,19 @@ jobs:
             "quick-test")
               VECTOR_LAYERS="5,10,20"
               RASTER_LAYERS="5,10,20"
+              POLYGONS_PER_LAYER="20"
               echo "### Benchmark Mode: Quick Test (minimal)" >> $GITHUB_STEP_SUMMARY
               ;;
             "ci-test")
-              VECTOR_LAYERS="10,20,50,100,200"
-              RASTER_LAYERS="10,50,100,500,1000"
+              VECTOR_LAYERS="10,20,50,100"
+              RASTER_LAYERS="10,50,100,500"
+              POLYGONS_PER_LAYER="50"
               echo "### Benchmark Mode: CI Test (reduced dataset)" >> $GITHUB_STEP_SUMMARY
               ;;
             "full")
               VECTOR_LAYERS="10,20,50,100,200,500,1000"
               RASTER_LAYERS="10,50,100,500,1000,5000,10000"
+              POLYGONS_PER_LAYER="100"
               echo "### Benchmark Mode: Full (paper values)" >> $GITHUB_STEP_SUMMARY
               echo "⚠️ Requires >16GB RAM - may OOM on GitHub Actions" >> $GITHUB_STEP_SUMMARY
               ;;
@@ -120,20 +123,24 @@ jobs:
           
           echo "vector_layers=${VECTOR_LAYERS}" >> $GITHUB_OUTPUT
           echo "raster_layers=${RASTER_LAYERS}" >> $GITHUB_OUTPUT
+          echo "polygons_per_layer=${POLYGONS_PER_LAYER}" >> $GITHUB_OUTPUT
           echo "- Vector layers: ${VECTOR_LAYERS}" >> $GITHUB_STEP_SUMMARY
           echo "- Raster layers: ${RASTER_LAYERS}" >> $GITHUB_STEP_SUMMARY
+          echo "- Polygons per layer: ${POLYGONS_PER_LAYER}" >> $GITHUB_STEP_SUMMARY
 
       - name: Run benchmark
         run: |
           echo "Running with:"
           echo "  VECTOR_LAYERS=${{ steps.params.outputs.vector_layers }}"
           echo "  RASTER_LAYERS=${{ steps.params.outputs.raster_layers }}"
+          echo "  POLYGONS_PER_LAYER=${{ steps.params.outputs.polygons_per_layer }}"
           
           docker run --rm \
             -v ${{ github.workspace }}/results:/app/results \
             -e RANDOM_SEED=${{ github.event.inputs.random_seed || '42' }} \
             -e VECTOR_LAYERS=${{ steps.params.outputs.vector_layers }} \
             -e RASTER_LAYERS=${{ steps.params.outputs.raster_layers }} \
+            -e POLYGONS_PER_LAYER=${{ steps.params.outputs.polygons_per_layer }} \
             ${{ steps.image.outputs.full_name }} \
             python run_replication.py --all --output results
 
