@@ -480,17 +480,23 @@ def run_vector_benchmark(config: Dict, data_dir: Path) -> pd.DataFrame:
             print(f"Only {len(layers)} layers available, skipping...")
             continue
         
-        # Benchmark DGGS method
+        # Benchmark DGGS method (always runs - scales well)
         dggs_index, dggs_classify, dggs_total = benchmark_dggs_vector(
             layers, config["h3_resolution"]
         )
         
-        # Benchmark vector method (only for smaller sizes to avoid memory issues)
-        if num_layers <= config["vector"]["max_layers_before_failure"]:
+        # Benchmark traditional vector method
+        # Only run if num_layers <= MAX_TRADITIONAL_LAYERS (to avoid OOM in CI)
+        max_traditional = int(os.environ.get("MAX_TRADITIONAL_LAYERS", 
+                                              config["vector"]["max_layers_before_failure"]))
+        
+        if num_layers <= max_traditional:
+            print(f"  Running traditional vector method...")
             vector_time, vector_success = benchmark_vector_union(layers)
         else:
             vector_time = np.nan
-            vector_success = False
+            vector_success = None  # None = skipped (vs False = failed)
+            print(f"  Skipping traditional method (layers {num_layers} > max {max_traditional})")
         
         result = {
             "num_layers": num_layers,
@@ -503,7 +509,9 @@ def run_vector_benchmark(config: Dict, data_dir: Path) -> pd.DataFrame:
         results.append(result)
         
         print(f"  DGGS: {dggs_total:.2f}s (index: {dggs_index:.2f}s, classify: {dggs_classify:.2f}s)")
-        if vector_success:
+        if vector_success is None:
+            pass  # Already printed skip message
+        elif vector_success:
             print(f"  Vector: {vector_time:.2f}s")
         else:
             print(f"  Vector: FAILED (memory/timeout)")
@@ -808,11 +816,14 @@ Examples:
         CONFIG["raster"]["num_layers_list"] = [int(x.strip()) for x in args.raster_layers.split(',')]
     
     # Print effective configuration
+    max_traditional = int(os.environ.get("MAX_TRADITIONAL_LAYERS", 
+                                          CONFIG["vector"]["max_layers_before_failure"]))
     print(f"Configuration:")
     print(f"  Random seed: {CONFIG['random_seed']}")
     print(f"  Vector layers: {CONFIG['vector']['num_layers_list']}")
     print(f"  Polygons per layer: {CONFIG['vector']['num_polygons_per_layer']}")
     print(f"  Raster layers: {CONFIG['raster']['num_layers_list']}")
+    print(f"  Max layers for traditional methods: {max_traditional}")
     print(f"  Output directory: {CONFIG['results_dir']}")
     
     # Setup directories
