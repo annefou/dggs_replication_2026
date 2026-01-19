@@ -8,13 +8,13 @@
 -->
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
-![Build Docker Image](https://github.com/annefou/dggs-benchmark-replication/actions/workflows/docker-build.yml/badge.svg)
-![Run Replication](https://github.com/annefou/dggs-benchmark-replication/actions/workflows/run-replication.yml/badge.svg)
+![Build Docker Image](https://github.com/annefou/dggs_replication_2026/actions/workflows/docker-build.yml/badge.svg)
+![Run Replication](https://github.com/annefou/dggs_replication_2026/workflows/run-replication.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 <!--
   If the above badges don't work, generate them from GitHub:
-  1. Go to: https://github.com/annefou/dggs-benchmark-replication/actions
+  1. Go to: https://github.com/annefou/dggs_replication_2026/actions
   2. Click on a workflow (e.g., "Build Docker Image")
   3. Click the "..." button (top right, next to search)
   4. Click "Create status badge"
@@ -152,11 +152,11 @@ docker run -v $(pwd)/results:/app/results \
     -e VECTOR_LAYERS=5,10,20,50,100 \
     -e POLYGONS_PER_LAYER=30 \
     -e MAX_TRADITIONAL_LAYERS=20 \
-    ghcr.io/annefou/dggs-benchmark-replication:latest
+    ghcr.io/annefou/dggs_replication_2026:latest
 
 # Full benchmark (paper values - requires ~16GB+ RAM)
 docker run -v $(pwd)/results:/app/results \
-    ghcr.io/annefou/dggs-benchmark-replication:latest
+    ghcr.io/annefou/dggs_replication_2026:latest
 ```
 
 ## Quick Start
@@ -221,10 +221,10 @@ The Docker image is automatically built and pushed to **GitHub Container Registr
 
 ```bash
 # Pull pre-built image from GitHub Container Registry
-docker pull ghcr.io/annefou/dggs-benchmark-replication:latest
+docker pull ghcr.io/annefou/dggs_replication_2026:latest
 
 # Run replication
-docker run -v $(pwd)/results:/app/results ghcr.io/annefou/dggs-benchmark-replication:latest
+docker run -v $(pwd)/results:/app/results ghcr.io/annefou/dggs_replication_2026:latest
 
 # Or build locally
 docker build -t dggs-benchmark-replication .
@@ -408,7 +408,7 @@ If you're using this as a template for your own replication study:
 
 ```bash
 # Clone this template
-git clone https://github.com/annefou/dggs-benchmark-replication.git
+git clone https://github.com/annefou/dggs_replication_2026.git
 cd dggs-benchmark-replication
 
 # Or use GitHub's "Use this template" feature
