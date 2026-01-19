@@ -58,7 +58,13 @@ RUN set -a && . /app/config.env && set +a && \
         ${DGGS_BENCHMARKS_REPO}.git \
         /app/original_benchmarks && \
     cd /app/original_benchmarks && \
-    echo "Cloned version: $(git describe --tags --always)" || \
+    echo "Cloned version: $(git describe --tags --always)" && \
+    echo "" && \
+    echo "=== Repository Contents ===" && \
+    ls -la && \
+    echo "" && \
+    echo "=== Python Files ===" && \
+    find . -name "*.py" -type f | head -20 || \
     echo "Warning: Could not clone original repo"
 
 # Copy our replication scripts

@@ -84,6 +84,14 @@ jobs:
           echo "Image digest:"
           docker inspect --format='{{index .RepoDigests 0}}' ${{ steps.image.outputs.full_name }}
 
+      - name: Explore original benchmark code
+        run: |
+          echo "## Original Benchmark Repository Contents" >> $GITHUB_STEP_SUMMARY
+          echo "Exploring what's in the paper's original benchmark code..." >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          docker run --rm ${{ steps.image.outputs.full_name }} python run_original_benchmarks.py --explore 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
       - name: Verify image contents
         run: |
           echo "## Image Verification" >> $GITHUB_STEP_SUMMARY
