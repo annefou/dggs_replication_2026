@@ -14,42 +14,42 @@ channels:
 
 dependencies:
   # Core geospatial - loose ranges
-  - gdal>=3.6,<4.0
-  - geopandas>=0.14
-  - rasterio>=1.3
-  - fiona>=1.9
-  - shapely>=2.0
-  - pyproj>=3.6
+  - gdal
+  - geopandas
+  - rasterio
+  - fiona
+  - shapely
+  - pyproj
   
   # Data processing
-  - numpy>=1.26
-  - pandas>=2.2
-  - pyarrow>=20.0        # ← IMPORTANT: >=20.0 for vector2dggs compatibility
+  - numpy
+  - pandas
+  - pyarrow
   
   # Visualization
-  - matplotlib>=3.8
-  - seaborn>=0.13
+  - matplotlib
+  - seaborn
   
   # Utilities
-  - tqdm>=4.66
-  - click>=8.1
-  - pyyaml>=6.0
-  - psutil>=5.9
+  - tqdm
+  - click
+  - pyyaml
+  - psutil
   
   # Pip packages
   - pip
   - pip:
     # H3 DGGS
-    - h3>=4
-    - h3pandas==0.3.0
+    - h3
+    - h3pandas
     
     # Paper tools
-    - vector2dggs==0.10.1
-    - raster2dggs==0.2.6
+    - vector2dggs
+    - raster2dggs
     
     # Other packages
-    - nlmpy==1.0.1
-    - memory_profiler==0.61.0
-    - jupyter==1.0.0
-    - ipykernel==6.29.0
-    - fastparquet==2024.2.0
+    - nlmpy
+    - memory_profiler
+    - jupyter
+    - ipykernel
+    - fastparquet
