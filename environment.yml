@@ -64,10 +64,8 @@ dependencies:
   # ---------------------------------------------------------------------------
   - pip
   - pip:
-    # H3 DGGS - CRITICAL: h3pandas must be >=0.3.7 to work with vector2dggs
-    # DO NOT USE 0.2.6 - it is incompatible
     - h3==3.7.7
-    - h3pandas==0.3.7
+    - h3pandas==0.3.0
     
     # Paper authors' optimized DGGS tools - pinned for reproducibility
     - vector2dggs==0.10.1

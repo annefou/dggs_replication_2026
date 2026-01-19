@@ -15,19 +15,9 @@
 # interoperable, and reproducible system of land-use mapping"
 # https://doi.org/10.1080/20964471.2024.2429847
 #
-# ============================================================
-# CRITICAL FIXES
-# ============================================================
-# h3pandas: upgraded from 0.2.6 to 0.3.7
-#   Reason: 0.2.6 is incompatible with vector2dggs (requires >=0.3,<0.4)
-#
-# vector2dggs, raster2dggs: pinned to specific versions
-#   Reason: Avoid pip resolver backtracking; ensure reproducibility
-# ============================================================
-
 # H3 DGGS
 h3==3.7.7
-h3pandas==0.3.7
+h3pandas==0.3.0
 
 # DGGS tools from the paper authors
 # These are the optimized libraries used in the actual benchmarks!
