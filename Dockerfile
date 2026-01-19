@@ -29,17 +29,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+# Create app directory and set ownership to mamba user
 WORKDIR /app
+RUN chown -R $MAMBA_USER:$MAMBA_USER /app
 
-# Copy config.env FIRST - this is our single source of truth
-COPY --chown=$MAMBA_USER:$MAMBA_USER config.env /app/config.env
-
-# Copy environment file for mamba
-COPY --chown=$MAMBA_USER:$MAMBA_USER environment.yml /app/environment.yml
-
-# Switch back to micromamba user
+# Switch to micromamba user for conda operations
 USER $MAMBA_USER
+
+# Copy environment file for mamba (as mamba user)
+COPY --chown=$MAMBA_USER:$MAMBA_USER environment.yml /app/environment.yml
+COPY --chown=$MAMBA_USER:$MAMBA_USER config.env /app/config.env
 
 # Create the conda environment with all dependencies
 # This handles GDAL and all geospatial libs cleanly!
@@ -49,7 +48,7 @@ RUN micromamba install -y -n base -f /app/environment.yml && \
 # Activate the environment by default
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
-# Clone the original benchmark repository using version from config.env
+# Clone the original benchmark repository (need root for git clone, then fix perms)
 USER root
 RUN set -a && . /app/config.env && set +a && \
     echo "================================================" && \
