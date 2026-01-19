@@ -101,6 +101,9 @@ if _missing:
 # Configuration
 # =============================================================================
 
+# Code version marker - change this to verify image rebuild
+CODE_VERSION = "2026-01-19-v3"
+
 def parse_layer_list(value: str) -> List[int]:
     """Parse comma-separated layer list string to list of ints."""
     if not value:
@@ -361,17 +364,21 @@ def benchmark_vector_union(layers: List[gpd.GeoDataFrame]) -> Tuple[float, bool]
     
     This simulates the traditional GIS approach of overlaying multiple
     vector layers using spatial union operations.
+    
+    Note: We only keep geometry to avoid column naming conflicts.
+    The benchmark measures geometry overlay time, which is the bottleneck.
     """
     start_time = time.perf_counter()
     success = True
     
     try:
-        # Progressive union (as would be done in traditional GIS)
-        result = layers[0].copy()
+        # Keep only geometry for clean overlay (avoids column conflicts)
+        result = layers[0][['geometry']].copy()
         
-        for layer in layers[1:]:
+        for i, layer in enumerate(layers[1:], start=1):
+            layer_geom = layer[['geometry']].copy()
             # This is expensive and can cause memory issues
-            result = gpd.overlay(result, layer, how='union')
+            result = gpd.overlay(result, layer_geom, how='union')
         
     except MemoryError:
         success = False
@@ -389,64 +396,42 @@ def benchmark_dggs_vector(layers: List[gpd.GeoDataFrame],
     Benchmark DGGS-based method for vector data.
     
     Steps:
-    1. Index: Convert each layer to H3 cells
-    2. Classify: Join all layers on H3 cell ID
+    1. Index: Convert each polygon centroid to H3 cell
+    2. Classify: Aggregate values by H3 cell ID
+    
+    Uses efficient concat + groupby instead of iterative merge (O(n) vs O(n²)).
     
     Returns: (indexing_time, classifying_time, total_time)
     """
-    # Step 1: Indexing - convert to H3
+    # Step 1: Indexing - convert centroids to H3
     index_start = time.perf_counter()
     
-    h3_dataframes = []
-    for i, gdf in enumerate(layers):
-        h3_cells = []
-        values = []
+    all_records = []
+    for layer_idx, gdf in enumerate(layers):
+        # Vectorized centroid calculation
+        centroids = gdf.geometry.centroid
         
-        for idx, row in gdf.iterrows():
-            geom = row.geometry
-            if geom is None or geom.is_empty:
-                continue
-            
-            # Get H3 cells that cover this geometry
-            try:
-                # Use polygon fill
-                coords = list(geom.exterior.coords)
-                cells = h3.polyfill_geojson(
-                    {"type": "Polygon", "coordinates": [coords]},
-                    h3_resolution
-                )
-                for cell in cells:
-                    h3_cells.append(cell)
-                    values.append(row['value'])
-            except:
-                # Fallback: use centroid
-                centroid = geom.centroid
+        for idx, (centroid, value) in enumerate(zip(centroids, gdf['value'])):
+            if centroid is not None:
                 cell = h3.geo_to_h3(centroid.y, centroid.x, h3_resolution)
-                h3_cells.append(cell)
-                values.append(row['value'])
-        
-        df = pd.DataFrame({
-            'h3_cell': h3_cells,
-            f'value_{i}': values
-        })
-        h3_dataframes.append(df)
+                all_records.append({
+                    'h3_cell': cell,
+                    'layer': layer_idx,
+                    'value': value
+                })
     
     index_time = time.perf_counter() - index_start
     
-    # Step 2: Classifying - join on H3 cell ID
+    # Step 2: Classifying - aggregate by H3 cell
     classify_start = time.perf_counter()
     
-    # Merge all dataframes on h3_cell
-    result = h3_dataframes[0]
-    for df in h3_dataframes[1:]:
-        result = result.merge(df, on='h3_cell', how='outer')
+    # Convert to DataFrame and pivot (much faster than iterative merge)
+    df = pd.DataFrame(all_records)
     
-    # Apply classification logic (sum of boolean values as in paper)
-    value_cols = [c for c in result.columns if c.startswith('value_')]
-    result['class'] = result[value_cols].apply(
-        lambda row: sum(1 for v in row if pd.notna(v) and v > 0.5),
-        axis=1
-    )
+    # Count values > 0.5 per H3 cell
+    df['above_threshold'] = (df['value'] > 0.5).astype(int)
+    result = df.groupby('h3_cell')['above_threshold'].sum().reset_index()
+    result.columns = ['h3_cell', 'class']
     
     classify_time = time.perf_counter() - classify_start
     total_time = index_time + classify_time
@@ -553,44 +538,48 @@ def benchmark_dggs_raster(layers: np.ndarray, h3_resolution: int) -> Tuple[float
     Benchmark DGGS-based method for raster data.
     
     Steps:
-    1. Index: Convert raster cells to H3 (via centroids)
-    2. Classify: Aggregate by H3 cell ID
+    1. Index: Map raster pixels to H3 cells (computed once)
+    2. Classify: Aggregate layer values by H3 cell
+    
+    Optimized: H3 mapping computed once, then reused for all layers.
     """
-    # Step 1: Indexing
+    # Step 1: Indexing - compute H3 grid once
     index_start = time.perf_counter()
     
     nrows, ncols = layers[0].shape
+    num_layers = len(layers)
     
-    # Create H3 cell mapping for raster grid
-    # Assume raster covers some geographic extent
-    lat_range = np.linspace(-10, 10, nrows)
-    lon_range = np.linspace(-10, 10, ncols)
+    # Create H3 cell mapping for raster grid (compute ONCE)
+    lat_range = np.linspace(-5, 5, nrows)
+    lon_range = np.linspace(-5, 5, ncols)
     
-    h3_grid = np.empty((nrows, ncols), dtype='U15')
+    # Map each pixel to its H3 cell
+    pixel_to_h3 = np.empty((nrows, ncols), dtype=object)
     for i, lat in enumerate(lat_range):
         for j, lon in enumerate(lon_range):
-            h3_grid[i, j] = h3.geo_to_h3(lat, lon, h3_resolution)
+            pixel_to_h3[i, j] = h3.geo_to_h3(lat, lon, h3_resolution)
     
-    # Convert all layers to H3-indexed dataframes
-    h3_data = {}
-    for layer_idx, layer in enumerate(layers):
-        for i in range(nrows):
-            for j in range(ncols):
-                cell = h3_grid[i, j]
-                if cell not in h3_data:
-                    h3_data[cell] = {}
-                h3_data[cell][f'v{layer_idx}'] = layer[i, j]
+    # Get unique H3 cells
+    unique_cells = list(set(pixel_to_h3.flatten()))
     
     index_time = time.perf_counter() - index_start
     
-    # Step 2: Classification
+    # Step 2: Classification - aggregate by H3 cell
     classify_start = time.perf_counter()
     
-    # Aggregate and classify
-    results = []
-    for cell, values in h3_data.items():
-        binary_sum = sum(1 for v in values.values() if v > 0.5)
-        results.append({'h3_cell': cell, 'class': binary_sum})
+    # For each H3 cell, count how many layers have value > 0.5
+    cell_counts = {}
+    for cell in unique_cells:
+        # Find all pixels in this H3 cell
+        mask = (pixel_to_h3 == cell)
+        
+        # Count layers where mean value > 0.5
+        count = 0
+        for layer_idx in range(num_layers):
+            layer_values = layers[layer_idx][mask]
+            if len(layer_values) > 0 and np.mean(layer_values) > 0.5:
+                count += 1
+        cell_counts[cell] = count
     
     classify_time = time.perf_counter() - classify_start
     total_time = index_time + classify_time
@@ -818,8 +807,10 @@ Examples:
     # Print effective configuration
     max_traditional = int(os.environ.get("MAX_TRADITIONAL_LAYERS", 
                                           CONFIG["vector"]["max_layers_before_failure"]))
+    print(f"Code version: {CODE_VERSION}")
     print(f"Configuration:")
     print(f"  Random seed: {CONFIG['random_seed']}")
+    print(f"  H3 resolution: {CONFIG['h3_resolution']}")
     print(f"  Vector layers: {CONFIG['vector']['num_layers_list']}")
     print(f"  Polygons per layer: {CONFIG['vector']['num_polygons_per_layer']}")
     print(f"  Raster layers: {CONFIG['raster']['num_layers_list']}")

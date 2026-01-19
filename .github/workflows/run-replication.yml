@@ -89,15 +89,10 @@ jobs:
           echo "## Image Verification" >> $GITHUB_STEP_SUMMARY
           echo "Checking that new code is in the image..." >> $GITHUB_STEP_SUMMARY
           
-          # Check if H3_RESOLUTION is in config.env
+          # Check code version
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "=== config.env ===" >> $GITHUB_STEP_SUMMARY
-          docker run --rm ${{ steps.image.outputs.full_name }} cat /app/config.env | head -30 >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Check if the new benchmark function exists
-          echo "=== Checking run_replication.py for centroid indexing ===" >> $GITHUB_STEP_SUMMARY
-          docker run --rm ${{ steps.image.outputs.full_name }} grep -c "centroid" /app/run_replication.py >> $GITHUB_STEP_SUMMARY || echo "0" >> $GITHUB_STEP_SUMMARY
+          echo "=== Code Version ===" >> $GITHUB_STEP_SUMMARY
+          docker run --rm ${{ steps.image.outputs.full_name }} grep "CODE_VERSION" /app/run_replication.py | head -1 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Show image info

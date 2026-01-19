@@ -101,12 +101,11 @@ jobs:
       - name: Test Docker image
         run: |
           docker build -t test-image .
-          echo "=== Checking config.env ==="
-          docker run --rm test-image cat /app/config.env
+          echo "=== Code Version ==="
+          docker run --rm test-image grep "CODE_VERSION" /app/run_replication.py | head -1
           echo ""
-          echo "=== Checking run_replication.py has new code ==="
-          docker run --rm test-image grep -c "centroid" /app/run_replication.py || echo "WARNING: centroid not found!"
-          docker run --rm test-image grep "H3 resolution" /app/run_replication.py | head -1 || echo "WARNING: H3 resolution print not found!"
+          echo "=== Checking config.env ==="
+          docker run --rm test-image cat /app/config.env | head -20
           echo ""
           echo "=== Testing imports ==="
           docker run --rm test-image python -c "import h3; import geopandas; print('Dependencies OK')"
