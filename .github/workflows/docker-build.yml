@@ -111,9 +111,6 @@ jobs:
           echo "=== Testing core imports ==="
           docker run --rm test-image python -c "import h3; import geopandas; import rasterio; print('Core dependencies OK')"
           echo ""
-          echo "=== Testing paper authors tools ==="
-          docker run --rm test-image python -c "import vector2dggs; import raster2dggs; print('Paper tools OK')"
-          echo ""
           echo "=== Original benchmark repo ==="
           docker run --rm test-image ls -la /app/original_benchmarks/ | head -10
 

@@ -9,47 +9,48 @@
 # Build:  docker build -t dggs-benchmark-replication .
 # Run:    docker run -it --rm -v $(pwd)/results:/app/results dggs-benchmark-replication
 #
-# Uses mamba for clean GDAL/geospatial dependency management
-#
 # Author: Anne Fouilloux
 # Date: 2026-01-17
 
-FROM mambaorg/micromamba:1.5-bookworm-slim
+FROM python:3.11-slim-bookworm
 
 # Set labels
 LABEL maintainer="Anne Fouilloux <annef@simula.no>"
 LABEL description="Reproducible environment for DGGS benchmark replication"
 LABEL paper.doi="10.1080/20964471.2024.2429847"
 
-# Switch to root for system setup
-USER root
+# Create app directory
+WORKDIR /app
 
-# Install git (needed to clone benchmark repo)
+# Install system dependencies including GDAL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
+    build-essential \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    gdal-bin \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory and set ownership to mamba user
-WORKDIR /app
-RUN chown -R $MAMBA_USER:$MAMBA_USER /app
+# Set GDAL environment variables
+ENV GDAL_CONFIG=/usr/bin/gdal-config
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
 
-# Switch to micromamba user for conda operations
-USER $MAMBA_USER
+# Copy config.env - single source of truth
+COPY config.env /app/config.env
 
-# Copy environment file for mamba (as mamba user)
-COPY --chown=$MAMBA_USER:$MAMBA_USER environment.yml /app/environment.yml
-COPY --chown=$MAMBA_USER:$MAMBA_USER config.env /app/config.env
+# Copy requirements and install Python dependencies
+COPY requirements.txt /app/requirements.txt
 
-# Create the conda environment with all dependencies
-# This handles GDAL and all geospatial libs cleanly!
-RUN micromamba install -y -n base -f /app/environment.yml && \
-    micromamba clean --all --yes
+# Install GDAL Python bindings matching system version, then other packages
+RUN GDAL_VERSION=$(gdal-config --version) && \
+    echo "System GDAL version: $GDAL_VERSION" && \
+    pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir "GDAL==$GDAL_VERSION" && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Activate the environment by default
-ARG MAMBA_DOCKERFILE_ACTIVATE=1
-
-# Clone the original benchmark repository (need root for git clone, then fix perms)
-USER root
+# Clone the original benchmark repository
 RUN set -a && . /app/config.env && set +a && \
     echo "================================================" && \
     echo "Cloning original benchmark repository:" && \
@@ -66,28 +67,23 @@ RUN set -a && . /app/config.env && set +a && \
     ls -la && \
     echo "" && \
     echo "=== Python Files ===" && \
-    find . -name "*.py" -type f | head -20 && \
-    chown -R $MAMBA_USER:$MAMBA_USER /app/original_benchmarks || \
+    find . -name "*.py" -type f | head -20 || \
     echo "Warning: Could not clone original repo"
 
 # Copy our replication script
-COPY --chown=$MAMBA_USER:$MAMBA_USER run_replication.py /app/
-COPY --chown=$MAMBA_USER:$MAMBA_USER README.md /app/
+COPY run_replication.py /app/
+COPY README.md /app/
 
 # Create directories for results
-RUN mkdir -p /app/results /app/data/vector /app/data/raster && \
-    chown -R $MAMBA_USER:$MAMBA_USER /app/results /app/data
+RUN mkdir -p /app/results /app/data/vector /app/data/raster
 
 # Copy entrypoint script
-COPY --chown=$MAMBA_USER:$MAMBA_USER entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-# Switch back to mamba user for running
-USER $MAMBA_USER
 
 # Set environment variables for reproducibility
 ENV PYTHONHASHSEED=42
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "run_replication.py", "--all"]
