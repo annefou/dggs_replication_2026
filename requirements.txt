@@ -16,7 +16,7 @@
 # https://doi.org/10.1080/20964471.2024.2429847
 #
 # H3 DGGS
-h3==3.7.7
+h3>=4
 h3pandas==0.3.0
 
 # DGGS tools from the paper authors

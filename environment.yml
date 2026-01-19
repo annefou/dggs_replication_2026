@@ -64,7 +64,7 @@ dependencies:
   # ---------------------------------------------------------------------------
   - pip
   - pip:
-    - h3==3.7.7
+    - h3>=4
     - h3pandas==0.3.0
     
     # Paper authors' optimized DGGS tools - pinned for reproducibility
