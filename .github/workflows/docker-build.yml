@@ -5,7 +5,9 @@
 # - New release/tag
 # - Manual trigger
 #
-# The image is used for reproducible benchmark execution
+# Registry is configured in config.env (DOCKER_REGISTRY)
+# Image is pushed to: ${DOCKER_REGISTRY}/${GITHUB_REPOSITORY}
+# e.g., ghcr.io/username/dggs-benchmark-replication
 
 name: Build Docker Image
 
@@ -16,6 +18,8 @@ on:
       - 'Dockerfile'
       - 'requirements.txt'
       - 'run_replication.py'
+      - 'config.env'
+      - 'entrypoint.sh'
       - '.github/workflows/docker-build.yml'
   release:
     types: [published]
@@ -26,10 +30,11 @@ on:
         required: false
         default: 'true'
         type: boolean
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+      no_cache:
+        description: 'Build without cache (forces fresh build)'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   build:
@@ -41,6 +46,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Load configuration from config.env
+      - name: Load configuration
+        id: config
+        run: |
+          while IFS='=' read -r key value; do
+            [[ "$key" =~ ^#.*$ ]] && continue
+            [[ -z "$key" ]] && continue
+            value="${value%\"}"
+            value="${value#\"}"
+            echo "${key}=${value}" >> $GITHUB_ENV
+          done < config.env
+          
+          # Set registry and image name
+          echo "REGISTRY=${DOCKER_REGISTRY:-ghcr.io}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${{ github.repository }}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -73,12 +94,21 @@ jobs:
           push: ${{ github.event_name != 'pull_request' && (github.event.inputs.push_image != 'false') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+          cache-from: ${{ github.event.inputs.no_cache == 'true' && '' || 'type=gha' }}
           cache-to: type=gha,mode=max
+          no-cache: ${{ github.event.inputs.no_cache == 'true' }}
 
       - name: Test Docker image
         run: |
           docker build -t test-image .
+          echo "=== Checking config.env ==="
+          docker run --rm test-image cat /app/config.env
+          echo ""
+          echo "=== Checking run_replication.py has new code ==="
+          docker run --rm test-image grep -c "centroid" /app/run_replication.py || echo "WARNING: centroid not found!"
+          docker run --rm test-image grep "H3 resolution" /app/run_replication.py | head -1 || echo "WARNING: H3 resolution print not found!"
+          echo ""
+          echo "=== Testing imports ==="
           docker run --rm test-image python -c "import h3; import geopandas; print('Dependencies OK')"
 
   # Create artifact with image info for downstream workflows
