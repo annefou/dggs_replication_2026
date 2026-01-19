@@ -15,27 +15,22 @@
 # interoperable, and reproducible system of land-use mapping"
 # https://doi.org/10.1080/20964471.2024.2429847
 #
-# All versions are pinned for reproducibility
+# ============================================================
+# CRITICAL FIXES
+# ============================================================
+# h3pandas: upgraded from 0.2.6 to 0.3.7
+#   Reason: 0.2.6 is incompatible with vector2dggs (requires >=0.3,<0.4)
+#
+# vector2dggs, raster2dggs: pinned to specific versions
+#   Reason: Avoid pip resolver backtracking; ensure reproducibility
 # ============================================================
 
-# Core geospatial
-numpy==1.26.4
-pandas==2.2.0
-geopandas==0.14.3
-shapely==2.0.2
-pyproj==3.6.1
-rasterio==1.3.9
-fiona==1.9.5
-
-# H3 DGGS - CRITICAL FIX
-# h3pandas 0.2.6 is incompatible with vector2dggs (requires >=0.3,<0.4)
-# Using 0.3.7 which is compatible with all vector2dggs versions
+# H3 DGGS
 h3==3.7.7
 h3pandas==0.3.7
 
 # DGGS tools from the paper authors
 # These are the optimized libraries used in the actual benchmarks!
-# Pinned versions for stability and reproducibility
 vector2dggs==0.10.1
 raster2dggs==0.2.6
 
@@ -62,3 +57,7 @@ pyyaml==6.0.1
 # Jupyter for interactive analysis (optional)
 jupyter==1.0.0
 ipykernel==6.29.0
+
+# NOTE: Core geospatial packages (numpy, pandas, geopandas, 
+# rasterio, fiona, shapely, pyproj, gdal) are installed via 
+# conda-forge in environment.yml for clean GDAL integration.

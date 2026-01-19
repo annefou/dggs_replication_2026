@@ -8,7 +8,7 @@
 #
 # Usage (local):
 #   mamba env create -f environment.yml
-#   mamba activate dggs-benchmark
+#   mamba activate dggs-replication
 #
 # Usage (Docker with micromamba):
 #   micromamba install -y -n base -f environment.yml
@@ -19,55 +19,53 @@
 # https://doi.org/10.1080/20964471.2024.2429847
 # =============================================================================
 
-name: base
+name: dggs-replication
 
 channels:
   - conda-forge
   - defaults
 
 dependencies:
-  # Python version
-  - python=3.11
-  
   # ---------------------------------------------------------------------------
   # Core geospatial - from conda-forge for clean GDAL integration
-  # PINNED to match requirements.txt for consistency
+  # Using loose version ranges to let conda find compatible builds
   # ---------------------------------------------------------------------------
-  - gdal=3.6.4
-  - geopandas=0.14.3
-  - rasterio=1.3.9
-  - fiona=1.9.5
-  - shapely=2.0.2
-  - pyproj=3.6.1
+  - gdal>=3.6,<4.0
+  - geopandas>=0.14
+  - rasterio>=1.3
+  - fiona>=1.9
+  - shapely>=2.0
+  - pyproj>=3.6
   
   # ---------------------------------------------------------------------------
-  # Data processing - PINNED versions
+  # Data processing
   # ---------------------------------------------------------------------------
-  - numpy=1.26.4
-  - pandas=2.2.0
-  - pyarrow=15.0.0
+  - numpy>=1.26
+  - pandas>=2.2
+  - pyarrow>=15.0
   
   # ---------------------------------------------------------------------------
   # Visualization
   # ---------------------------------------------------------------------------
-  - matplotlib=3.8.2
-  - seaborn=0.13.2
+  - matplotlib>=3.8
+  - seaborn>=0.13
   
   # ---------------------------------------------------------------------------
   # Utilities
   # ---------------------------------------------------------------------------
-  - tqdm=4.66.1
-  - click=8.1.7
-  - pyyaml=6.0.1
-  - psutil=5.9.8
+  - tqdm>=4.66
+  - click>=8.1
+  - pyyaml>=6.0
+  - psutil>=5.9
   
   # ---------------------------------------------------------------------------
   # Pip packages (not available in conda-forge or need specific versions)
-  # THIS IS THE AUTHORITATIVE SOURCE - matches requirements.txt exactly
+  # THESE ARE PINNED FOR REPRODUCIBILITY
   # ---------------------------------------------------------------------------
   - pip
   - pip:
-    # H3 DGGS - FIXED TO 0.3.7 (incompatible with 0.2.6)
+    # H3 DGGS - CRITICAL: h3pandas must be >=0.3.7 to work with vector2dggs
+    # DO NOT USE 0.2.6 - it is incompatible
     - h3==3.7.7
     - h3pandas==0.3.7
     
@@ -75,15 +73,15 @@ dependencies:
     - vector2dggs==0.10.1
     - raster2dggs==0.2.6
     
-    # NLM raster generation (as in paper)
+    # NLM raster generation
     - nlmpy==1.0.1
     
     # Memory profiling
     - memory_profiler==0.61.0
     
-    # Jupyter
+    # Jupyter for interactive analysis
     - jupyter==1.0.0
     - ipykernel==6.29.0
     
-    # Additional fastparquet
+    # Parquet support (optional but recommended)
     - fastparquet==2024.2.0
