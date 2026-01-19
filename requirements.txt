@@ -27,14 +27,15 @@ pyproj==3.6.1
 rasterio==1.3.9
 fiona==1.9.5
 
-# H3 DGGS
+# H3 DGGS - FIXED: h3pandas 0.3.x compatible with vector2dggs
 h3==3.7.7
 h3pandas==0.3.7
 
 # DGGS tools from the paper authors
 # These are the optimized libraries used in the actual benchmarks!
-vector2dggs>=0.9.0
-raster2dggs>=0.2.0
+# FIXED: Pinned to specific compatible versions
+vector2dggs==0.10.1
+raster2dggs==0.2.6
 
 # Data generation (Neutral Landscape Models)
 nlmpy==1.0.1
