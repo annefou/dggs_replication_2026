@@ -19,7 +19,6 @@ on:
       - 'environment.yml'
       - 'requirements.txt'
       - 'run_replication.py'
-      - 'run_original_benchmarks.py'
       - 'config.env'
       - 'entrypoint.sh'
       - '.github/workflows/docker-build.yml'

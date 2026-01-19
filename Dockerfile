@@ -71,9 +71,8 @@ RUN set -a && . /app/config.env && set +a && \
     chown -R $MAMBA_USER:$MAMBA_USER /app/original_benchmarks || \
     echo "Warning: Could not clone original repo"
 
-# Copy our replication scripts
+# Copy our replication script
 COPY --chown=$MAMBA_USER:$MAMBA_USER run_replication.py /app/
-COPY --chown=$MAMBA_USER:$MAMBA_USER run_original_benchmarks.py /app/
 COPY --chown=$MAMBA_USER:$MAMBA_USER README.md /app/
 
 # Create directories for results

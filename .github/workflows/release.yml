@@ -1,0 +1,136 @@
+# Create Release with Replication Results
+#
+# This workflow:
+# 1. Runs the full replication benchmark
+# 2. Creates a GitHub release with version tag
+# 3. Attaches benchmark results to the release
+# 4. Zenodo automatically archives releases (if linked)
+#
+# Triggered manually when ready to publish a new version
+
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: 'false'
+        type: boolean
+      run_benchmarks:
+        description: 'Run benchmarks before release'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  # Run benchmarks if requested
+  benchmark:
+    if: ${{ github.event.inputs.run_benchmarks == 'true' }}
+    uses: ./.github/workflows/run-replication.yml
+    with:
+      benchmark_type: all
+      random_seed: '42'
+      upload_to_release: false
+
+  # Create the release
+  release:
+    needs: [benchmark]
+    if: always() && (needs.benchmark.result == 'success' || github.event.inputs.run_benchmarks == 'false')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download benchmark results
+        if: ${{ github.event.inputs.run_benchmarks == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: replication-results-*
+          path: results
+          merge-multiple: true
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat << 'EOF' > release_notes.md
+          ## DGGS Benchmark Replication - ${{ github.event.inputs.version }}
+          
+          This release contains a reproducible replication of the benchmarks from:
+          
+          > Law, R.M. & Ardo, J. (2024). "Using a discrete global grid system for a scalable, 
+          > interoperable, and reproducible system of land-use mapping"
+          > DOI: [10.1080/20964471.2024.2429847](https://doi.org/10.1080/20964471.2024.2429847)
+          
+          ### What's Included
+          
+          - 🐳 Docker image: `ghcr.io/${{ github.repository }}:${{ github.event.inputs.version }}`
+          - 📊 Benchmark results (CSV, JSON)
+          - 📈 Comparison plots (PNG, PDF)
+          - 📝 System information for reproducibility
+          
+          ### Running the Replication
+          
+          ```bash
+          # Using Docker
+          docker pull ghcr.io/${{ github.repository }}:${{ github.event.inputs.version }}
+          docker run -v $(pwd)/results:/app/results ghcr.io/${{ github.repository }}:${{ github.event.inputs.version }}
+          
+          # Using source
+          git checkout ${{ github.event.inputs.version }}
+          pip install -r requirements.txt
+          python run_replication.py --all
+          ```
+          
+          ### Original Benchmark Version
+          
+          This replication is based on [dggsBenchmarks v1.1.1](https://github.com/manaakiwhenua/dggsBenchmarks/releases/tag/v1.1.1)
+          
+          ### Zenodo Archive
+          
+          This release is automatically archived to Zenodo. See the DOI badge in the README for citation.
+          EOF
+          
+          echo "notes_file=release_notes.md" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: "DGGS Benchmark Replication ${{ github.event.inputs.version }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          files: |
+            results/*.csv
+            results/*.json
+            results/*.png
+            results/*.pdf
+            requirements.txt
+            environment.yml
+            Dockerfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Docker image tags
+        run: |
+          echo "Release created: ${{ github.event.inputs.version }}"
+          echo "Docker image will be tagged: ghcr.io/${{ github.repository }}:${{ github.event.inputs.version }}"
+          echo ""
+          echo "To pull this specific version:"
+          echo "  docker pull ghcr.io/${{ github.repository }}:${{ github.event.inputs.version }}"
+
+  # Trigger Docker build with release tag
+  docker-release:
+    needs: release
+    uses: ./.github/workflows/docker-build.yml
