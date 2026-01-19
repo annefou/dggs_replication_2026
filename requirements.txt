@@ -36,7 +36,6 @@ psutil==5.9.8
 memory_profiler==0.61.0
 
 # Data storage (Apache Parquet)
-pyarrow==15.0.0
 fastparquet==2024.2.0
 
 # Utilities
