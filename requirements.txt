@@ -1,33 +1,17 @@
 # DGGS Benchmark Replication - Python Dependencies
-#
-# ============================================================
-# THIS FILE IS THE SINGLE SOURCE OF TRUTH FOR PYTHON PACKAGES
-# ============================================================
-#
-# Used by:
-#   - Dockerfile (pip install -r requirements.txt)
-#   - environment.yml (pip: -r requirements.txt)
-#   - GitHub Actions (pip install -r requirements.txt)
-#   - Local development (pip install -r requirements.txt)
-#
-# Replication of: Law & Ardo (2024)
-# "Using a discrete global grid system for a scalable,
-# interoperable, and reproducible system of land-use mapping"
-# https://doi.org/10.1080/20964471.2024.2429847
-#
+
 # H3 DGGS
 h3>=4
 h3pandas==0.3.0
 
-# DGGS tools from the paper authors
-# These are the optimized libraries used in the actual benchmarks!
+# DGGS tools - UPGRADED raster2dggs for dask compatibility
 vector2dggs==0.10.1
-raster2dggs==0.2.6
+raster2dggs==0.7.0       # ← UPGRADED from 0.2.6 (supports newer dask)
 
-# Data generation (Neutral Landscape Models)
+# Data generation
 nlmpy==1.0.1
 
-# Visualization (optional, for result analysis)
+# Visualization
 matplotlib==3.8.2
 seaborn==0.13.2
 
@@ -35,18 +19,14 @@ seaborn==0.13.2
 psutil==5.9.8
 memory_profiler==0.61.0
 
-# Data storage (Apache Parquet)
-fastparquet==2024.2.0
-
 # Utilities
 tqdm==4.66.1
 click==8.1.7
 pyyaml==6.0.1
 
-# Jupyter for interactive analysis (optional)
+# Jupyter
 jupyter==1.0.0
 ipykernel==6.29.0
 
-# NOTE: Core geospatial packages (numpy, pandas, geopandas, 
-# rasterio, fiona, shapely, pyproj, gdal) are installed via 
-# conda-forge in environment.yml for clean GDAL integration.
+# Parquet
+fastparquet==2024.2.0

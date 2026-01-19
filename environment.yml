@@ -2,20 +2,7 @@
 # DGGS Benchmark Replication - Conda/Mamba Environment
 # =============================================================================
 #
-# This file defines the complete Python environment for the DGGS benchmark
-# replication. Using mamba/conda ensures clean GDAL installation without
-# version conflicts.
-#
-# Usage (local):
-#   mamba env create -f environment.yml
-#   mamba activate dggs-replication
-#
-# Usage (Docker with micromamba):
-#   micromamba install -y -n base -f environment.yml
-#
 # Replication of: Law & Ardo (2024)
-# "Using a discrete global grid system for a scalable, interoperable, 
-# and reproducible system of land-use mapping"
 # https://doi.org/10.1080/20964471.2024.2429847
 # =============================================================================
 
@@ -26,10 +13,7 @@ channels:
   - defaults
 
 dependencies:
-  # ---------------------------------------------------------------------------
-  # Core geospatial - from conda-forge for clean GDAL integration
-  # Using loose version ranges to let conda find compatible builds
-  # ---------------------------------------------------------------------------
+  # Core geospatial - loose ranges
   - gdal>=3.6,<4.0
   - geopandas>=0.14
   - rasterio>=1.3
@@ -37,49 +21,35 @@ dependencies:
   - shapely>=2.0
   - pyproj>=3.6
   
-  # ---------------------------------------------------------------------------
   # Data processing
-  # ---------------------------------------------------------------------------
   - numpy>=1.26
   - pandas>=2.2
-  - pyarrow>=20.0
+  - pyarrow>=20.0        # ← IMPORTANT: >=20.0 for vector2dggs compatibility
   
-  # ---------------------------------------------------------------------------
   # Visualization
-  # ---------------------------------------------------------------------------
   - matplotlib>=3.8
   - seaborn>=0.13
   
-  # ---------------------------------------------------------------------------
   # Utilities
-  # ---------------------------------------------------------------------------
   - tqdm>=4.66
   - click>=8.1
   - pyyaml>=6.0
   - psutil>=5.9
   
-  # ---------------------------------------------------------------------------
-  # Pip packages (not available in conda-forge or need specific versions)
-  # THESE ARE PINNED FOR REPRODUCIBILITY
-  # ---------------------------------------------------------------------------
+  # Pip packages
   - pip
   - pip:
+    # H3 DGGS
     - h3>=4
     - h3pandas==0.3.0
     
-    # Paper authors' optimized DGGS tools - pinned for reproducibility
+    # Paper tools
     - vector2dggs==0.10.1
     - raster2dggs==0.2.6
     
-    # NLM raster generation
+    # Other packages
     - nlmpy==1.0.1
-    
-    # Memory profiling
     - memory_profiler==0.61.0
-    
-    # Jupyter for interactive analysis
     - jupyter==1.0.0
     - ipykernel==6.29.0
-    
-    # Parquet support (optional but recommended)
     - fastparquet==2024.2.0
