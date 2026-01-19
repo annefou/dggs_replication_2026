@@ -16,8 +16,10 @@ on:
     branches: [main]
     paths:
       - 'Dockerfile'
+      - 'environment.yml'
       - 'requirements.txt'
       - 'run_replication.py'
+      - 'run_original_benchmarks.py'
       - 'config.env'
       - 'entrypoint.sh'
       - '.github/workflows/docker-build.yml'
@@ -102,13 +104,19 @@ jobs:
         run: |
           docker build -t test-image .
           echo "=== Code Version ==="
-          docker run --rm test-image grep "CODE_VERSION" /app/run_replication.py | head -1
+          docker run --rm test-image grep "CODE_VERSION" /app/run_replication.py | head -1 || echo "No version marker"
           echo ""
           echo "=== Checking config.env ==="
           docker run --rm test-image cat /app/config.env | head -20
           echo ""
-          echo "=== Testing imports ==="
-          docker run --rm test-image python -c "import h3; import geopandas; print('Dependencies OK')"
+          echo "=== Testing core imports ==="
+          docker run --rm test-image python -c "import h3; import geopandas; import rasterio; print('Core dependencies OK')"
+          echo ""
+          echo "=== Testing paper authors tools ==="
+          docker run --rm test-image python -c "import vector2dggs; import raster2dggs; print('Paper tools OK')"
+          echo ""
+          echo "=== Original benchmark repo ==="
+          docker run --rm test-image ls -la /app/original_benchmarks/ | head -10
 
   # Create artifact with image info for downstream workflows
   output-info:
