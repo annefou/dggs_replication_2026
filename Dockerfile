@@ -9,8 +9,14 @@
 # Build:  docker build -t dggs-benchmark-replication .
 # Run:    docker run -it --rm -v $(pwd)/results:/app/results dggs-benchmark-replication
 #
+# Environment variables (passed via docker run -e):
+#   VECTOR_LAYERS     Comma-separated list (e.g., "5,10,20,50,100")
+#   RASTER_LAYERS     Comma-separated list (e.g., "10,50,100,500")
+#   H3_RESOLUTION     H3 resolution for raster benchmark (default: 9)
+#   RANDOM_SEED       Random seed for reproducibility (default: 42)
+#
 # Author: Anne Fouilloux
-# Date: 2026-01-17
+# Date: 2026-01-20
 
 FROM python:3.11-slim-bookworm
 
@@ -37,9 +43,6 @@ ENV GDAL_CONFIG=/usr/bin/gdal-config
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
 
-# Copy config.env - single source of truth
-COPY config.env /app/config.env
-
 # Copy requirements and install Python dependencies
 COPY requirements.txt /app/requirements.txt
 
@@ -50,26 +53,6 @@ RUN GDAL_VERSION=$(gdal-config --version) && \
     pip install --no-cache-dir "GDAL==$GDAL_VERSION" && \
     pip install --no-cache-dir -r requirements.txt
 
-# Clone the original benchmark repository
-RUN set -a && . /app/config.env && set +a && \
-    echo "================================================" && \
-    echo "Cloning original benchmark repository:" && \
-    echo "  Repo:    ${DGGS_BENCHMARKS_REPO}" && \
-    echo "  Version: ${DGGS_BENCHMARKS_VERSION}" && \
-    echo "================================================" && \
-    git clone --depth 1 --branch ${DGGS_BENCHMARKS_VERSION} \
-        ${DGGS_BENCHMARKS_REPO}.git \
-        /app/original_benchmarks && \
-    cd /app/original_benchmarks && \
-    echo "Cloned version: $(git describe --tags --always)" && \
-    echo "" && \
-    echo "=== Repository Contents ===" && \
-    ls -la && \
-    echo "" && \
-    echo "=== Python Files ===" && \
-    find . -name "*.py" -type f | head -20 || \
-    echo "Warning: Could not clone original repo"
-
 # Copy our replication script
 COPY run_replication.py /app/
 COPY README.md /app/
@@ -77,13 +60,15 @@ COPY README.md /app/
 # Create directories for results
 RUN mkdir -p /app/results /app/data/vector /app/data/raster
 
-# Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 # Set environment variables for reproducibility
 ENV PYTHONHASHSEED=42
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "run_replication.py", "--all"]
+# Default configuration (can be overridden via docker run -e)
+ENV VECTOR_LAYERS="5,10,20,50,100"
+ENV RASTER_LAYERS="10,50,100,500"
+ENV H3_RESOLUTION="9"
+ENV RANDOM_SEED="42"
+
+# Default command
+CMD ["python", "run_replication.py", "--all", "--output", "results"]

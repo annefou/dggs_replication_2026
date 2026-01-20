@@ -763,17 +763,57 @@ def generate_summary(vector_df: pd.DataFrame, raster_df: pd.DataFrame, output_di
 # =============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="DGGS Benchmark: Reproduction & Replication")
-    parser.add_argument("--output", "-o", default="results_unified")
-    parser.add_argument("--vector-layers", type=str, default=None)
-    parser.add_argument("--raster-layers", type=str, default=None)
-    parser.add_argument("--skip-vector", action="store_true")
-    parser.add_argument("--skip-raster", action="store_true")
+    parser = argparse.ArgumentParser(
+        description="DGGS Benchmark: Reproduction & Replication Study",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Replication of: Law & Ardo (2024) 
+"Using a discrete global grid system for a scalable, interoperable, 
+and reproducible system of land-use mapping"
+DOI: 10.1080/20964471.2024.2429847
+
+Environment variables (override defaults):
+  VECTOR_LAYERS       Comma-separated list (e.g., "5,10,20,50,100")
+  RASTER_LAYERS       Comma-separated list (e.g., "10,50,100,500")
+  H3_RESOLUTION       H3 resolution for raster benchmark (default: 9)
+  RANDOM_SEED         Random seed for reproducibility (default: 42)
+        """
+    )
+    parser.add_argument("--all", action="store_true", 
+                        help="Run all benchmarks (vector and raster)")
+    parser.add_argument("--output", "-o", default="results",
+                        help="Output directory (default: results)")
+    parser.add_argument("--vector-layers", type=str, default=None,
+                        help="Comma-separated vector layer counts")
+    parser.add_argument("--raster-layers", type=str, default=None,
+                        help="Comma-separated raster layer counts")
+    parser.add_argument("--skip-vector", action="store_true",
+                        help="Skip vector benchmark")
+    parser.add_argument("--skip-raster", action="store_true",
+                        help="Skip raster benchmark")
     args = parser.parse_args()
     
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    # Priority: CLI args > Environment variables > Defaults
+    # Read from environment variables (for Docker)
+    env_vector_layers = os.environ.get("VECTOR_LAYERS")
+    env_raster_layers = os.environ.get("RASTER_LAYERS")
+    env_h3_resolution = os.environ.get("H3_RESOLUTION")
+    env_random_seed = os.environ.get("RANDOM_SEED")
+    
+    # Apply environment variables
+    if env_vector_layers:
+        CONFIG["vector"]["num_layers_list"] = [int(x) for x in env_vector_layers.split(",")]
+    if env_raster_layers:
+        CONFIG["raster"]["num_layers_list"] = [int(x) for x in env_raster_layers.split(",")]
+    if env_h3_resolution:
+        CONFIG["raster"]["h3_resolution"] = int(env_h3_resolution)
+    if env_random_seed:
+        CONFIG["random_seed"] = int(env_random_seed)
+    
+    # CLI args override environment variables
     if args.vector_layers:
         CONFIG["vector"]["num_layers_list"] = [int(x) for x in args.vector_layers.split(",")]
     if args.raster_layers:
@@ -784,25 +824,47 @@ def main():
     print("DGGS BENCHMARK: REPRODUCTION AND REPLICATION STUDY")
     print("=" * 70)
     print(f"Code version: {CODE_VERSION}")
+    print(f"\nConfiguration:")
+    print(f"  Output directory:  {output_dir}")
+    print(f"  Random seed:       {CONFIG['random_seed']}")
+    print(f"  Vector layers:     {CONFIG['vector']['num_layers_list']}")
+    print(f"  Raster layers:     {CONFIG['raster']['num_layers_list']}")
+    print(f"  H3 resolution:     {CONFIG['raster']['h3_resolution']}")
     print(f"\nDependencies:")
     print(f"  xdggs:  {'✅ Available' if HAS_XDGGS else '❌ Not installed'}")
     print(f"  Polars: {'✅ Available' if HAS_POLARS else '❌ Not installed'}")
     print(f"  SciPy:  {'✅ Available' if HAS_SCIPY else '❌ Not installed'}")
     
     # System info
+    sys_info = get_system_info()
+    sys_info["configuration"] = {
+        "vector_layers": CONFIG["vector"]["num_layers_list"],
+        "raster_layers": CONFIG["raster"]["num_layers_list"],
+        "h3_resolution": CONFIG["raster"]["h3_resolution"],
+        "random_seed": CONFIG["random_seed"],
+    }
     with open(output_dir / "system_info.json", 'w') as f:
-        json.dump(get_system_info(), f, indent=2)
+        json.dump(sys_info, f, indent=2)
+    
+    # Determine what to run
+    # --all means run everything (default behavior)
+    run_vector = not args.skip_vector
+    run_raster = not args.skip_raster
+    
+    if args.all:
+        run_vector = True
+        run_raster = True
     
     # Benchmarks
     vector_df = pd.DataFrame()
     raster_df = pd.DataFrame()
     
-    if not args.skip_vector:
+    if run_vector:
         vector_df = run_vector_benchmark(CONFIG, output_dir)
     elif (output_dir / "vector_benchmark.csv").exists():
         vector_df = pd.read_csv(output_dir / "vector_benchmark.csv")
     
-    if not args.skip_raster:
+    if run_raster:
         raster_df = run_raster_benchmark(CONFIG, output_dir)
     elif (output_dir / "raster_benchmark.csv").exists():
         raster_df = pd.read_csv(output_dir / "raster_benchmark.csv")
