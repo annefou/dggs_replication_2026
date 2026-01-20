@@ -41,6 +41,7 @@ from shapely.geometry import Polygon, MultiPolygon
 from shapely.ops import unary_union
 import h3
 from tqdm import tqdm
+import xdggs
 
 # Try to import optional dependencies
 try:
@@ -536,59 +537,70 @@ def benchmark_raster_warp_classify(layers: np.ndarray) -> Tuple[float, float, fl
     return warp_time, classify_time, total_time
 
 
+
 def benchmark_dggs_raster(layers: np.ndarray, h3_resolution: int) -> Tuple[float, float, float]:
     """
-    Benchmark DGGS-based method for raster data.
-    
-    Steps:
-    1. Index: Map raster pixels to H3 cells (computed once)
-    2. Classify: Aggregate layer values by H3 cell
-    
-    Optimized: H3 mapping computed once, then reused for all layers.
+    Optimized DGGS-based method for raster data using xdggs.
     """
-    # Step 1: Indexing - compute H3 grid once
+    if isinstance(layers, list):
+        layers = np.stack(layers, axis=0)
+    
+    num_layers, nrows, ncols = layers.shape
+    
+    # ===== STEP 1: INDEXING with xdggs =====
     index_start = time.perf_counter()
     
-    nrows, ncols = layers[0].shape
-    num_layers = len(layers)
+    # Create coordinate meshgrid
+    lats = np.linspace(-5, 5, nrows)
+    lons = np.linspace(-5, 5, ncols)
+    lon_grid, lat_grid = np.meshgrid(lons, lats)
     
-    # Create H3 cell mapping for raster grid (compute ONCE)
-    lat_range = np.linspace(-5, 5, nrows)
-    lon_range = np.linspace(-5, 5, ncols)
+    # Flatten for xdggs
+    lat_flat = lat_grid.ravel()
+    lon_flat = lon_grid.ravel()
     
-    # Map each pixel to its H3 cell
-    pixel_to_h3 = np.empty((nrows, ncols), dtype=object)
-    for i, lat in enumerate(lat_range):
-        for j, lon in enumerate(lon_range):
-            pixel_to_h3[i, j] = h3.geo_to_h3(lat, lon, h3_resolution)
+    # VECTORIZED H3 conversion using xdggs!
+    # Note: xdggs uses 'level' instead of 'resolution'
+    h3_info = xdggs.H3Info(level=h3_resolution)
+    cell_ids_arrow = h3_info.geographic2cell_ids(lon_flat, lat_flat)
+    cell_ids = np.asarray(cell_ids_arrow)
     
-    # Get unique H3 cells
-    unique_cells = list(set(pixel_to_h3.flatten()))
+    # Get unique cells for efficient grouping
+    unique_cells, inverse_indices = np.unique(cell_ids, return_inverse=True)
+    num_cells = len(unique_cells)
     
     index_time = time.perf_counter() - index_start
     
-    # Step 2: Classification - aggregate by H3 cell
+    # ===== STEP 2: CLASSIFICATION (vectorized) =====
     classify_start = time.perf_counter()
     
-    # For each H3 cell, count how many layers have value > 0.5
-    cell_counts = {}
-    for cell in unique_cells:
-        # Find all pixels in this H3 cell
-        mask = (pixel_to_h3 == cell)
-        
-        # Count layers where mean value > 0.5
-        count = 0
-        for layer_idx in range(num_layers):
-            layer_values = layers[layer_idx][mask]
-            if len(layer_values) > 0 and np.mean(layer_values) > 0.5:
-                count += 1
-        cell_counts[cell] = count
+    # Threshold all layers at once
+    binary = (layers > 0.5).astype(np.float32)
+    flat_binary = binary.reshape(num_layers, -1)
+    
+    # Pixel counts per cell
+    cell_pixel_counts = np.bincount(inverse_indices, minlength=num_cells)
+    
+    # Vectorized aggregation with bincount
+    cell_sums = np.zeros((num_layers, num_cells), dtype=np.float32)
+    for layer_idx in range(num_layers):
+        cell_sums[layer_idx] = np.bincount(
+            inverse_indices,
+            weights=flat_binary[layer_idx],
+            minlength=num_cells
+        )
+    
+    # Compute means and count
+    with np.errstate(divide='ignore', invalid='ignore'):
+        cell_means = cell_sums / cell_pixel_counts
+        cell_means = np.nan_to_num(cell_means, nan=0.0)
+    
+    result_counts = (cell_means > 0.5).sum(axis=0)
     
     classify_time = time.perf_counter() - classify_start
     total_time = index_time + classify_time
     
     return index_time, classify_time, total_time
-
 
 def run_raster_benchmark(config: Dict, data_dir: Path) -> pd.DataFrame:
     """Run the complete raster benchmark (Figure 7)."""
