@@ -46,6 +46,9 @@ ENV C_INCLUDE_PATH=/usr/include/gdal
 # Copy requirements and install Python dependencies
 COPY requirements.txt /app/requirements.txt
 
+# Copy config.env for documentation
+COPY config.env /app/config.env
+
 # Install GDAL Python bindings matching system version, then other packages
 RUN GDAL_VERSION=$(gdal-config --version) && \
     echo "System GDAL version: $GDAL_VERSION" && \
