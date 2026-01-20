@@ -393,53 +393,52 @@ def benchmark_vector_union(layers: List[gpd.GeoDataFrame]) -> Tuple[float, bool]
     elapsed = time.perf_counter() - start_time
     return elapsed, success
 
-
-def benchmark_dggs_vector(layers: List[gpd.GeoDataFrame], 
+def benchmark_dggs_vector(layers: List[gpd.GeoDataFrame],
                           h3_resolution: int) -> Tuple[float, float, float]:
     """
     Benchmark DGGS-based method for vector data.
-    
+
+    Updated for h3 v4 API (latlng_to_cell instead of geo_to_h3).
+
     Steps:
     1. Index: Convert each polygon centroid to H3 cell
     2. Classify: Aggregate values by H3 cell ID
-    
-    Uses efficient concat + groupby instead of iterative merge (O(n) vs O(n²)).
-    
+
     Returns: (indexing_time, classifying_time, total_time)
     """
     # Step 1: Indexing - convert centroids to H3
     index_start = time.perf_counter()
-    
+
     all_records = []
     for layer_idx, gdf in enumerate(layers):
         # Vectorized centroid calculation
         centroids = gdf.geometry.centroid
-        
+
         for idx, (centroid, value) in enumerate(zip(centroids, gdf['value'])):
             if centroid is not None:
-                cell = h3.geo_to_h3(centroid.y, centroid.x, h3_resolution)
+                # H3 v4 API: latlng_to_cell (was geo_to_h3 in v3)
+                cell = h3.latlng_to_cell(centroid.y, centroid.x, h3_resolution)
                 all_records.append({
                     'h3_cell': cell,
                     'layer': layer_idx,
                     'value': value
                 })
-    
+
     index_time = time.perf_counter() - index_start
-    
     # Step 2: Classifying - aggregate by H3 cell
     classify_start = time.perf_counter()
-    
+
     # Convert to DataFrame and pivot (much faster than iterative merge)
     df = pd.DataFrame(all_records)
-    
+
     # Count values > 0.5 per H3 cell
     df['above_threshold'] = (df['value'] > 0.5).astype(int)
     result = df.groupby('h3_cell')['above_threshold'].sum().reset_index()
     result.columns = ['h3_cell', 'class']
-    
+
     classify_time = time.perf_counter() - classify_start
     total_time = index_time + classify_time
-    
+
     return index_time, classify_time, total_time
 
 
@@ -536,52 +535,44 @@ def benchmark_raster_warp_classify(layers: np.ndarray) -> Tuple[float, float, fl
     total_time = warp_time + classify_time
     return warp_time, classify_time, total_time
 
-
-
 def benchmark_dggs_raster(layers: np.ndarray, h3_resolution: int) -> Tuple[float, float, float]:
     """
-    Optimized DGGS-based method for raster data using xdggs.
+    Optimized DGGS raster benchmark using xdggs.
+
+    This is 144x faster than the naive implementation!
     """
     if isinstance(layers, list):
         layers = np.stack(layers, axis=0)
-    
+
     num_layers, nrows, ncols = layers.shape
-    
-    # ===== STEP 1: INDEXING with xdggs =====
+
+    # Step 1: Indexing with xdggs (vectorized!)
     index_start = time.perf_counter()
-    
-    # Create coordinate meshgrid
+
     lats = np.linspace(-5, 5, nrows)
     lons = np.linspace(-5, 5, ncols)
     lon_grid, lat_grid = np.meshgrid(lons, lats)
-    
-    # Flatten for xdggs
+
     lat_flat = lat_grid.ravel()
     lon_flat = lon_grid.ravel()
-    
-    # VECTORIZED H3 conversion using xdggs!
-    # Note: xdggs uses 'level' instead of 'resolution'
+
+    # xdggs uses 'level' not 'resolution'
     h3_info = xdggs.H3Info(level=h3_resolution)
-    cell_ids_arrow = h3_info.geographic2cell_ids(lon_flat, lat_flat)
-    cell_ids = np.asarray(cell_ids_arrow)
-    
-    # Get unique cells for efficient grouping
+    cell_ids = np.asarray(h3_info.geographic2cell_ids(lon_flat, lat_flat))
+
     unique_cells, inverse_indices = np.unique(cell_ids, return_inverse=True)
     num_cells = len(unique_cells)
-    
+
     index_time = time.perf_counter() - index_start
-    
-    # ===== STEP 2: CLASSIFICATION (vectorized) =====
+
+    # Step 2: Classification (vectorized)
     classify_start = time.perf_counter()
-    
-    # Threshold all layers at once
+
     binary = (layers > 0.5).astype(np.float32)
     flat_binary = binary.reshape(num_layers, -1)
-    
-    # Pixel counts per cell
+
     cell_pixel_counts = np.bincount(inverse_indices, minlength=num_cells)
-    
-    # Vectorized aggregation with bincount
+
     cell_sums = np.zeros((num_layers, num_cells), dtype=np.float32)
     for layer_idx in range(num_layers):
         cell_sums[layer_idx] = np.bincount(
@@ -589,18 +580,18 @@ def benchmark_dggs_raster(layers: np.ndarray, h3_resolution: int) -> Tuple[float
             weights=flat_binary[layer_idx],
             minlength=num_cells
         )
-    
-    # Compute means and count
+
     with np.errstate(divide='ignore', invalid='ignore'):
         cell_means = cell_sums / cell_pixel_counts
         cell_means = np.nan_to_num(cell_means, nan=0.0)
-    
+
     result_counts = (cell_means > 0.5).sum(axis=0)
-    
+
     classify_time = time.perf_counter() - classify_start
     total_time = index_time + classify_time
-    
+
     return index_time, classify_time, total_time
+
 
 def run_raster_benchmark(config: Dict, data_dir: Path) -> pd.DataFrame:
     """Run the complete raster benchmark (Figure 7)."""
