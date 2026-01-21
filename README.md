@@ -300,4 +300,4 @@ The original benchmark code is subject to its own license terms.
 - Original research by Richard M. Law and James Ardo at Manaaki Whenua – Landcare Research
 - H3 library by Uber Technologies
 - xdggs library for vectorized DGGS operations
-- This replication follows the framework from the [Replication Handbook](https://doi.org/10.31222/osf.io/mbrxt)
+- This replication follows the framework from the [Replication Handbook](https://forrt.org/replication_handbook/)
