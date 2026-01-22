@@ -6,7 +6,7 @@
 #
 # UPDATED: 2026-01-20
 # - Upgraded to numpy 2.x for xdggs compatibility
-# - xdggs provides vectorized H3 conversion (144x faster!)
+# - xdggs provides vectorized H3 conversion
 #
 # Replication of: Law & Ardo (2024)
 # "Using a discrete global grid system for a scalable,
