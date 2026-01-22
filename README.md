@@ -176,6 +176,14 @@ docker run -v $(pwd)/results:/app/results \
     ghcr.io/annefou/dggs_replication_2026:latest
 ```
 
+### Reproducing / Replicating the origin al paper
+
+```bash
+python run_replication.py --output results_more --vector-layers "5,10,20,50" --raster-layers "10,50,100,500,1000,5000,10000"
+```
+
+Please note that the larger configurations cannot be exectued with the github actions due to lack of memory.
+ 
 ## GitHub Actions: Automated Replication
 
 ### Triggering a Replication Run
