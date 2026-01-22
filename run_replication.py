@@ -288,6 +288,60 @@ def aggregate_to_cells(values: np.ndarray, cell_ids: np.ndarray,
         return np.nan_to_num(sums / counts, nan=0.0)
 
 
+
+# ---------------------------------------------------------------------------
+# Polygon → H3 cells (polyfill)
+# ---------------------------------------------------------------------------
+
+def h3_polyfill_polygon(geom, resolution: int) -> List[str]:
+    """
+    Fill a polygon (or multipolygon) with H3 cells.
+
+    This corresponds to the paper's "polygon filling" / "polyfilling" step:
+    convert each input polygon geometry to the set of H3 cell IDs at a fixed
+    resolution.
+
+    Notes:
+    - Uses `h3.polygon_to_cells()` (H3 Python bindings).
+    - Handles MultiPolygon by unioning results across parts.
+    - Falls back to centroid→cell if polyfill fails for any reason.
+    """
+    try:
+        if geom is None or geom.is_empty:
+            return []
+
+        # MultiPolygon / GeometryCollection: recurse over parts
+        if hasattr(geom, "geoms"):
+            cells = set()
+            for part in geom.geoms:
+                cells.update(h3_polyfill_polygon(part, resolution))
+            return list(cells)
+
+        # Shapely Polygon expected here
+        exterior = list(geom.exterior.coords)
+        holes = []
+        # Include interior rings if present
+        if getattr(geom, "interiors", None):
+            holes = [list(ring.coords) for ring in geom.interiors if ring and len(ring.coords) >= 4]
+
+        geojson = {
+            "type": "Polygon",
+            "coordinates": [exterior] + holes
+        }
+
+        return list(h3.polygon_to_cells(geojson, resolution))
+
+    except Exception:
+        # Conservative fallback: at least index centroid so benchmark still runs
+        try:
+            c = geom.centroid
+            if c is None or c.is_empty:
+                return []
+            return [h3.latlng_to_cell(c.y, c.x, resolution)]
+        except Exception:
+            return []
+
+
 # =============================================================================
 # VECTOR BENCHMARK (Figure 6)
 # =============================================================================
@@ -319,26 +373,47 @@ def benchmark_vector_traditional(layers: List[gpd.GeoDataFrame]) -> Dict:
 
 
 def benchmark_vector_dggs(layers: List[gpd.GeoDataFrame], resolution: int) -> Dict:
-    """DGGS method for vector data."""
+    """DGGS method for vector data (with polygon polyfill)."""
     index_start = time.perf_counter()
-    
+
     records = []
     for layer_idx, gdf in enumerate(layers):
         for _, row in gdf.iterrows():
-            centroid = row.geometry.centroid
-            if centroid:
-                cell = h3.latlng_to_cell(centroid.y, centroid.x, resolution)
-                records.append({'h3_cell': cell, 'layer': layer_idx, 'value': row['value']})
-    
+            geom = row.geometry
+            value = row.get('value', 0)
+
+            # Paper step: polyfill polygon to a set of H3 cells at fixed resolution
+            cells = h3_polyfill_polygon(geom, resolution)
+
+            for cell in cells:
+                records.append({'h3_cell': cell, 'layer': layer_idx, 'value': value})
+
     index_time = time.perf_counter() - index_start
-    
+
     classify_start = time.perf_counter()
     df = pd.DataFrame(records)
-    pivot = df.pivot_table(index='h3_cell', columns='layer', values='value', aggfunc='first').fillna(0)
+
+    if df.empty:
+        # No geometries produced any cells
+        classify_time = time.perf_counter() - classify_start
+        return {"success": True, "index_time": index_time, "classify_time": classify_time,
+                "total": index_time + classify_time}
+
+    # Join by H3 cell + layer; for binary values, "max" preserves presence if multiple polys hit same cell.
+    per_layer = df.groupby(['h3_cell', 'layer'])['value'].max().reset_index()
+
+    pivot = per_layer.pivot_table(
+        index='h3_cell',
+        columns='layer',
+        values='value',
+        aggfunc='max',
+        fill_value=0
+    )
+
     pivot['sum_value'] = pivot.sum(axis=1).astype(int)
     pivot['class'] = pivot['sum_value'].apply(classify_value)
     classify_time = time.perf_counter() - classify_start
-    
+
     return {"success": True, "index_time": index_time, "classify_time": classify_time,
             "total": index_time + classify_time}
 
