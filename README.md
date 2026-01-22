@@ -1,6 +1,6 @@
 # DGGS Benchmark Replication Environment
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18339339.svg)](https://doi.org/10.5281/zenodo.18339339)
 ![Build Docker Image](https://github.com/annefou/dggs_replication_2026/actions/workflows/docker-build.yml/badge.svg)
 ![Run Replication](https://github.com/annefou/dggs_replication_2026/actions/workflows/run-replication.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
