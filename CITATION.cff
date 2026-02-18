@@ -13,8 +13,8 @@ authors:
 repository-code: "https://github.com/annefou/dggs-benchmark-replication"
 url: "https://github.com/annefou/dggs-benchmark-replication"
 license: MIT
-version: "1.0.0"
-date-released: "2026-01-17"
+version: "2.0.0"
+date-released: "2026-01-21"
 keywords:
   - DGGS
   - discrete global grid system
