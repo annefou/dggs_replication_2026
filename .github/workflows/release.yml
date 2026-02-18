@@ -28,6 +28,9 @@ on:
         default: 'true'
         type: boolean
 
+permissions:
+  contents: write
+
 jobs:
   # Run benchmarks if requested
   benchmark:
