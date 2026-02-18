@@ -176,7 +176,7 @@ docker run -v $(pwd)/results:/app/results \
     ghcr.io/annefou/dggs_replication_2026:latest
 ```
 
-### Reproducing / Replicating the origin al paper
+### Reproducing / Replicating the original paper
 
 ```bash
 python run_replication.py --output results_more --vector-layers "5,10,20,50" --raster-layers "10,50,100,500,1000,5000,10000"
@@ -243,8 +243,8 @@ This repository is linked to Zenodo for persistent archival and DOI assignment.
   title        = {DGGS Benchmark Replication Environment},
   year         = 2026,
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.XXXXXXX},
-  url          = {https://doi.org/10.5281/zenodo.XXXXXXX}
+  doi          = {10.5281/zenodo.18339339},
+  url          = {https://doi.org/10.5281/zenodo.18339339}
 }
 ```
 
