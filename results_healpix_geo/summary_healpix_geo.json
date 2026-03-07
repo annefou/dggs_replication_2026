@@ -1,0 +1,56 @@
+{
+  "paper": {
+    "doi": "10.1080/20964471.2024.2429847",
+    "original_dggs": "H3"
+  },
+  "replication": {
+    "library": "healpix-geo",
+    "version": "0.0.11",
+    "ellipsoids": [
+      "sphere",
+      "WGS84"
+    ]
+  },
+  "results": {
+    "vector_sphere": {
+      "speedup_min": "14.3x",
+      "speedup_max": "3037.9x",
+      "validated": true
+    },
+    "vector_wgs84": {
+      "speedup_min": "16.4x",
+      "speedup_max": "2990.7x",
+      "validated": true
+    },
+    "raster_sphere": {
+      "raster_healpix_ratio": "158.19x",
+      "validated": false
+    },
+    "raster_wgs84": {
+      "raster_healpix_ratio": "296.19x",
+      "validated": false
+    },
+    "ellipsoid_analysis": {
+      "equatorial": {
+        "center_lat": 0.0,
+        "pixels_different_pct": 26.56,
+        "polygon_jaccard": 0.9951
+      },
+      "mid_latitude": {
+        "center_lat": 47.5,
+        "pixels_different_pct": 98.44,
+        "polygon_jaccard": 0.9844
+      },
+      "high_latitude": {
+        "center_lat": 62.5,
+        "pixels_different_pct": 90.76,
+        "polygon_jaccard": 0.9868
+      },
+      "arctic": {
+        "center_lat": 77.5,
+        "pixels_different_pct": 52.6,
+        "polygon_jaccard": 0.9908
+      }
+    }
+  }
+}

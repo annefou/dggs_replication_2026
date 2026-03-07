@@ -25,6 +25,8 @@ numpy>=2.0.0
 xdggs>=0.5.0
 # xdggs pulls in: h3ronpy, arro3-core, healpix-geo, lonboard, etc.
 
+healpix-geo>=0.0.11
+
 # H3 for naive benchmark comparison
 h3>=4.0.0
 

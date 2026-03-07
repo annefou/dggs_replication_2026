@@ -1,0 +1,43 @@
+{
+  "generated": "2026-03-07T19:50:47.121906",
+  "code_version": "2026-03-07-comparison-v1",
+  "paper": {
+    "doi": "10.1080/20964471.2024.2429847"
+  },
+  "methods": {
+    "H3 (sphere)": {
+      "max_speedup": 5800.0,
+      "crossover_layers": 5.0
+    },
+    "HEALPix/sphere": {
+      "max_speedup": 5691.0,
+      "crossover_layers": 5.203001602257749
+    },
+    "HEALPix/WGS84": {
+      "max_speedup": 5602.5,
+      "crossover_layers": 5.0
+    }
+  },
+  "ellipsoid_analysis": {
+    "equatorial": {
+      "center_lat": 0.0,
+      "pixels_different_pct": 26.56,
+      "jaccard": 0.9951
+    },
+    "mid_latitude": {
+      "center_lat": 47.5,
+      "pixels_different_pct": 98.44,
+      "jaccard": 0.9844
+    },
+    "high_latitude": {
+      "center_lat": 62.5,
+      "pixels_different_pct": 90.76,
+      "jaccard": 0.9868
+    },
+    "arctic": {
+      "center_lat": 77.5,
+      "pixels_different_pct": 52.6,
+      "jaccard": 0.9908
+    }
+  }
+}

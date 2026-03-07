@@ -1,0 +1,19 @@
+{
+  "paper": {
+    "doi": "10.1080/20964471.2024.2429847",
+    "original_dggs": "H3"
+  },
+  "replication": {
+    "dggs": "HEALPix"
+  },
+  "results": {
+    "vector": {
+      "speedup_range": "1x - 163x",
+      "validated": true
+    },
+    "raster": {
+      "ratio": "2.38x",
+      "validated": true
+    }
+  }
+}

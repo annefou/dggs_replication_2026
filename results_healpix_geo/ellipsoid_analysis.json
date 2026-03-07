@@ -1,0 +1,82 @@
+{
+  "equatorial": {
+    "region": "equatorial",
+    "bbox": [
+      -10.0,
+      -10.0,
+      10.0,
+      10.0
+    ],
+    "center_lat": 0.0,
+    "center_lon": 0.0,
+    "healpix_depth": 9,
+    "raster_pixels": 2500,
+    "pixels_different_cell": 664,
+    "pixels_different_pct": 26.56,
+    "unique_cells_sphere": 2500,
+    "unique_cells_wgs84": 2500,
+    "polygon_jaccard_similarity": 0.9951,
+    "polygon_cells_only_sphere": 152,
+    "polygon_cells_only_wgs84": 0
+  },
+  "mid_latitude": {
+    "region": "mid_latitude",
+    "bbox": [
+      -5.0,
+      40.0,
+      25.0,
+      55.0
+    ],
+    "center_lat": 47.5,
+    "center_lon": 10.0,
+    "healpix_depth": 9,
+    "raster_pixels": 2500,
+    "pixels_different_cell": 2461,
+    "pixels_different_pct": 98.44,
+    "unique_cells_sphere": 2500,
+    "unique_cells_wgs84": 2500,
+    "polygon_jaccard_similarity": 0.9844,
+    "polygon_cells_only_sphere": 152,
+    "polygon_cells_only_wgs84": 214
+  },
+  "high_latitude": {
+    "region": "high_latitude",
+    "bbox": [
+      5.0,
+      55.0,
+      30.0,
+      70.0
+    ],
+    "center_lat": 62.5,
+    "center_lon": 17.5,
+    "healpix_depth": 9,
+    "raster_pixels": 2500,
+    "pixels_different_cell": 2269,
+    "pixels_different_pct": 90.76,
+    "unique_cells_sphere": 2500,
+    "unique_cells_wgs84": 2500,
+    "polygon_jaccard_similarity": 0.9868,
+    "polygon_cells_only_sphere": 47,
+    "polygon_cells_only_wgs84": 129
+  },
+  "arctic": {
+    "region": "arctic",
+    "bbox": [
+      -20.0,
+      70.0,
+      30.0,
+      85.0
+    ],
+    "center_lat": 77.5,
+    "center_lon": 5.0,
+    "healpix_depth": 9,
+    "raster_pixels": 2500,
+    "pixels_different_cell": 1315,
+    "pixels_different_pct": 52.6,
+    "unique_cells_sphere": 2477,
+    "unique_cells_wgs84": 2473,
+    "polygon_jaccard_similarity": 0.9908,
+    "polygon_cells_only_sphere": 9,
+    "polygon_cells_only_wgs84": 95
+  }
+}

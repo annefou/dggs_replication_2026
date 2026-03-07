@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-03-07T18:51:25.090014",
+  "code_version": "2026-03-07-healpix-geo-v1",
+  "python_version": "3.12.12",
+  "paper": {
+    "doi": "10.1080/20964471.2024.2429847"
+  },
+  "replication": {
+    "dggs_library": "healpix-geo",
+    "dggs_library_version": "0.0.11",
+    "original_dggs": "H3",
+    "ellipsoids_compared": [
+      "sphere",
+      "WGS84"
+    ]
+  },
+  "dependencies": {
+    "healpix_geo": "0.0.11",
+    "numpy": "2.4.1",
+    "pandas": "2.3.3",
+    "geopandas": "1.1.2"
+  },
+  "system": {
+    "cpu_count": 10,
+    "memory_gb": 32.0
+  }
+}
