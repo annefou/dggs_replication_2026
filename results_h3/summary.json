@@ -1,0 +1,44 @@
+{
+  "paper": {
+    "doi": "10.1080/20964471.2024.2429847",
+    "title": "Using a discrete global grid system for a scalable, interoperable, and reproducible system of land-use mapping",
+    "claims": {
+      "vector": "DGGS provides orders of magnitude performance improvement",
+      "raster": "DGGS and raster methods show roughly equivalent performance"
+    }
+  },
+  "methods": {
+    "reproduction": {
+      "description": "Same methodology, same tools (H3 + Polars)",
+      "tools": [
+        "H3 library",
+        "Polars",
+        "Parquet (pre-indexed data)"
+      ]
+    },
+    "replication": {
+      "description": "Same methodology, alternative tools (xdggs)",
+      "tools": [
+        "xdggs (vectorized H3 indexing)"
+      ]
+    }
+  },
+  "results": {
+    "vector_benchmark": {
+      "speedup_range": "16x - 5800x",
+      "paper_claim_validated": true,
+      "conclusion": "DGGS is orders of magnitude faster than vector overlay"
+    },
+    "raster_benchmark": {
+      "classification_ratio": "2.81x",
+      "paper_claim_validated": false,
+      "conclusion": "DGGS and raster have roughly equivalent classification performance"
+    },
+    "indexing_benchmark": {
+      "h3_loop_time": "0.0084s",
+      "xdggs_time": "0.0054s",
+      "xdggs_speedup": "1.6x",
+      "conclusion": "xdggs vectorized indexing is significantly faster than H3 loop"
+    }
+  }
+}

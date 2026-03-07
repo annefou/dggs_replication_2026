@@ -1,0 +1,24 @@
+{
+  "depth": 9,
+  "bbox": [
+    -0.5,
+    -0.5,
+    0.5,
+    0.5
+  ],
+  "raster_size": [
+    100,
+    100
+  ],
+  "pixel_cell_assignment_diff_pct": 1.6,
+  "ellipsoids": {
+    "sphere": {
+      "num_cells": 98,
+      "index_time_s": 0.0007670409977436066
+    },
+    "WGS84": {
+      "num_cells": 98,
+      "index_time_s": 0.00033666699891909957
+    }
+  }
+}

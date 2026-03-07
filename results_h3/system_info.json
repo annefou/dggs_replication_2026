@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-03-07T19:17:55.589337",
+  "code_version": "2026-01-20-unified-v3",
+  "python_version": "3.12.12",
+  "paper": {
+    "doi": "10.1080/20964471.2024.2429847",
+    "authors": "Law, R.M. & Ardo, J.",
+    "year": 2024
+  },
+  "dependencies": {
+    "numpy": "2.4.1",
+    "pandas": "2.3.3",
+    "geopandas": "1.1.2",
+    "h3": "4.4.1",
+    "xdggs": "available",
+    "polars": "1.37.1"
+  },
+  "system": {
+    "cpu_count": 10,
+    "memory_gb": 32.0
+  },
+  "configuration": {
+    "vector_layers": [
+      5,
+      10,
+      20,
+      50
+    ],
+    "raster_layers": [
+      10,
+      50,
+      100,
+      500
+    ],
+    "h3_resolution": 9,
+    "random_seed": 42
+  }
+}
