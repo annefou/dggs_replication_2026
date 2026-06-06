@@ -1,0 +1,94 @@
+name: Build and Deploy Jupyter Book
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      pages_enabled: ${{ steps.pages_check.outputs.pages_enabled }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check whether GitHub Pages is enabled
+        id: pages_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh api "repos/${{ github.repository }}/pages" >/dev/null 2>&1; then
+            echo "::notice::GitHub Pages is enabled — Jupyter Book will deploy."
+            echo "pages_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::GitHub Pages is not yet enabled on this repo. Build will run; deploy will be skipped. Enable Pages at https://github.com/${{ github.repository }}/settings/pages (Source: GitHub Actions) to enable deploy on the next push."
+            echo "pages_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # requirements.txt is the single source of truth for the analysis deps
+          # (pandas, matplotlib, ...). The book tooling is added on top.
+          pip install -r requirements.txt
+          pip install jupytext nbclient ipykernel mystmd
+
+      # Convert the jupytext .py notebooks to .ipynb. Glob, not a hard-coded
+      # list — new notebooks are picked up automatically. _helpers.py is a
+      # plain module (imported by the notebooks), not itself a notebook.
+      - name: Convert .py notebooks to .ipynb
+        run: |
+          for nb in notebooks/0*.py; do
+            jupytext --to notebook "$nb"
+          done
+
+      # Execute so plots and tables appear. Safe here because the notebooks only
+      # LOAD committed results — they do not re-run the timing benchmarks.
+      - name: Execute notebooks
+        run: |
+          for nb in notebooks/0*.ipynb; do
+            echo "::group::Executing $nb"
+            jupyter execute --inplace "$nb"
+            echo "::endgroup::"
+          done
+
+      - name: Build MyST site
+        env:
+          # MyST silently ignores `base_url` in myst.yml — only this env var
+          # works. It must match the repo name so asset paths resolve under
+          # https://<user>.github.io/<repo>/.
+          BASE_URL: /${{ github.event.repository.name }}
+        run: myst build --html
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _build/html
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages_enabled == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

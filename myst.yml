@@ -1,0 +1,21 @@
+version: 1
+project:
+  title: "DGGS Benchmark Replication"
+  authors:
+    - name: "Anne Fouilloux"
+      orcid: "0000-0002-1784-2920"
+      affiliations:
+        - "LifeWatch ERIC"
+  github: https://github.com/annefou/dggs_replication_2026
+  license: MIT
+  toc:
+    - file: index.md
+    - file: notebooks/01_overview.ipynb
+    - file: notebooks/02_h3_replication.ipynb
+    - file: notebooks/03_healpix_benchmarks.ipynb
+    - file: notebooks/04_comparison.ipynb
+site:
+  title: "DGGS Benchmark Replication"
+# IMPORTANT: do NOT set base_url here — MyST silently ignores the key.
+# BASE_URL is set in .github/workflows/jupyter-book.yml as an env var on the
+# `myst build` step, derived from the GitHub repo name.

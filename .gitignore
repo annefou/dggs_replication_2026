@@ -71,6 +71,12 @@ instance/
 # Sphinx documentation
 docs/_build/
 
+# MyST / Jupyter Book build artifacts
+# The notebook source of truth is notebooks/*.py (jupytext py:percent).
+# The .ipynb files are generated from them in CI and must not be committed.
+_build/
+notebooks/*.ipynb
+
 # PyBuilder
 .pybuilder/
 target/
